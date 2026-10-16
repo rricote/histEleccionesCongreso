@@ -43,8 +43,8 @@
   <section class="card" id="pbcard"></section>
   <div class="cols one">
     <section class="card">
-      <h2>Municipios de la provincia</h2>
-      <p class="note">Pulsa una fila para ver el municipio, con el resultado por secciones censales. Ordena con las cabeceras.</p>
+      <h2 id="mtt">Municipios de la provincia</h2>
+      <p class="note" id="mtn">Pulsa una fila para ver el municipio, con el resultado por secciones censales. Ordena con las cabeceras.</p>
       <label class="fld sel" style="max-width:260px"><span class="lbl">Filtrar por nombre</span><input id="mfilt" class="in" style="border:1px solid var(--rule);padding:7px 9px" placeholder="Escribe…"></label>
       <div class="tw tall"><table class="pt mt mun" id="mtab"></table></div>
     </section>
@@ -77,8 +77,8 @@ function map() {
   hoverFront(svg);
   const oldp = document.getElementById('upanel'); if (oldp) oldp.remove();
   if (MODE === 'mun') attachPanel(svg, 'path[data-m]', 'm', id => { const m = M.find(x => x.id === id); if (!m) return null;
-    return { title: m.n, meta: `${nf(m.censo)} electores · ${nf(m.secs)} ${m.secs === 1 ? 'sección censal' : 'secciones censales'}`, v: m.v, bl: m.bl, nu: m.nu, censo: m.censo, ref: { v: P.v, bl: P.bl }, refName: 'la provincia',
-      action: { label: 'Ver detallado por sección censal →', run: () => nav(hMun(m.id)) } } }, 'Pasa el ratón por un municipio para ver su voto al detalle. Pulsa para fijarlo y poder ir a su vista por secciones censales.');
+    return { title: m.n, meta: `${nf(m.censo)} electores${G.sections ? ` · ${nf(m.secs)} ${m.secs === 1 ? 'sección censal' : 'secciones censales'}` : ''}`, v: m.v, bl: m.bl, nu: m.nu, censo: m.censo, ref: { v: P.v, bl: P.bl }, refName: 'la provincia',
+      action: { label: G.sections ? 'Ver detallado por sección censal →' : 'Ver el municipio →', run: () => nav(hMun(m.id)) } } }, G.sections ? 'Pasa el ratón por un municipio para ver su voto al detalle. Pulsa para fijarlo y poder ir a su vista por secciones censales.' : 'Pasa el ratón por un municipio para ver su voto al detalle. Pulsa para fijarlo y poder ir a su vista.');
   $('#mleg').innerHTML = [...used].map(i => `<span><i style="background:${pcol(i)}"></i>${esc(G.parties[i].n)}</span>`).join('') + (MODE === 'mun' ? '<span>Más pálido = ventaja más corta</span>' : '');
   const key = k => { const j = SEQ.indexOf(k); return j < 0 ? SEQ.indexOf('PP') - 0.5 : j };
   const list = []; A.order.filter(i => A.es[i] > 0).sort((a, b) => key(G.parties[a].k) - key(G.parties[b].k)).forEach(i => { for (let n = 0; n < A.es[i]; n++) list.push(i) });
@@ -142,7 +142,7 @@ function pblock() {
     units.push({ key: PID + mm[0], name: `${mm[1]} · Dist. ${s[0].slice(0, 2)} Sec. ${s[0].slice(2)}`, censo: s[1], part: s[1] ? (valid + s[3]) / s[1] : 0, v, bl: s[2], nu: s[3] }) })) }
   const mun = PBM === 'mun';
   partyBlock($('#pbcard'), { state: PBS, ps, units, parent: { v: P.v, bl: P.bl }, parentName: 'de la provincia',
-    modes: [{ id: 'mun', label: 'Por municipio' }, { id: 'sec', label: 'Por sección censal' }], mode: PBM, onMode: x => { PBM = x; pblock() },
+    modes: G.sections ? [{ id: 'mun', label: 'Por municipio' }, { id: 'sec', label: 'Por sección censal' }] : null, mode: PBM, onMode: x => { PBM = x; pblock() },
     unitName: mun ? 'Municipio' : 'Sección censal', unitsPl: mun ? 'municipios' : 'secciones censales',
     note: `El número junto al nombre es su escaños en la provincia. Elige un partido, el nivel (municipios o secciones censales) y cómo ordenar: la tabla muestra los diez primeros.`.replace('su escaños', 'su número de escaños'),
     chipSub: j => nf(A.es[j]) + ' esc.', onRow: id => nav(hMun(id)) });
@@ -162,14 +162,15 @@ function mtable() {
 (async () => {
   try {
     await loadG(); P = G.prov[G.pi[PID]]; A = analyze(P);
-    [PJ, MAPM] = await Promise.all([jget(BASE + 'prov_' + PID + '.json'), jget('mapas/mun_' + PID + '.json')]);
+    [PJ, MAPM] = await Promise.all([loadProv(PID), loadMunMap(PID)]);
+    if (!G.sections) { $('#tab-muns').textContent = 'Análisis detallado de los municipios'; $('#mtt').textContent = 'Municipios de la provincia'; $('#mtn').textContent = 'Pulsa una fila para ver el municipio. Ordena con las cabeceras.' }
     build(); setPill(); document.title = P.n + ' · resultados por provincia';
     crumbs([{ t: 'General', h: href('index.html') }, { l: 'Provincia', t: P.n }]);
     await mountBar(PID); mountTabs();
     map(); detail(); lastSeat(); mtable(); pblock();
     $('#vMun').onclick = () => { MODE = 'mun'; map() }; $('#vProv').onclick = () => { MODE = 'prov'; map() };
     $('#mfilt').oninput = e => { FILT = e.target.value; mtable() };
-    $('#notes').innerHTML = '<div><b>Fuente.</b> Ministerio del Interior: resultados del Congreso por mesa. Cada mesa se agrega por sección censal, municipio y provincia; el voto CERA (residentes en el extranjero) cuenta solo a escala provincial.</div>';
+    $('#notes').innerHTML = notesHTML();
   } catch (e) { console.error(e) }
 })();
 </script>

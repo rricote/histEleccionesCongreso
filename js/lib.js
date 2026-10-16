@@ -14,17 +14,24 @@ function nav(u) { try { const [pg, qs] = u.split('?'); sessionStorage.setItem('n
 document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (!a || e.defaultPrevented || e.ctrlKey || e.metaKey) return; const h = a.getAttribute('href'); if (h && !/^(https?:|#|mailto:)/.test(h)) { try { const [pg, qs] = h.split('?'); sessionStorage.setItem('nav', JSON.stringify({ page: pg, q: Object.fromEntries(new URLSearchParams(qs || '')) })) } catch (x) { } } }, true);
 const ELEC = Q.get('e') || '2023-07';
 const BASE = 'datos/' + ELEC + '/';
-/* En http(s) se lee el .json; abierto con doble clic (file://) se carga el .json.js equivalente, porque el navegador bloquea fetch en local. */
-const jget = u => {
-  if (location.protocol === 'file:') return new Promise((ok, ko) => {
-    const w = (window.__J = window.__J || {});
-    if (w[u]) return ok(w[u]);
-    const sc = document.createElement('script'); sc.src = u + '.js';
-    sc.onload = () => w[u] ? ok(w[u]) : ko(new Error(u + ' vacío')); sc.onerror = () => ko(new Error(u + ' no encontrado'));
-    document.head.appendChild(sc);
-  });
-  return fetch(u).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json() });
-};
+/* Todos los datos se cargan como scripts (.json.js): así funcionan igual en http(s) y abriendo el archivo con doble clic (file://). */
+const jget = u => new Promise((ok, ko) => {
+  const w = (window.__J = window.__J || {});
+  if (w[u]) return ok(w[u]);
+  const sc = document.createElement('script'); sc.src = u + '.js';
+  sc.onload = () => w[u] ? ok(w[u]) : ko(new Error(u + ' vacío')); sc.onerror = () => ko(new Error(u + ' no encontrado'));
+  document.head.appendChild(sc);
+});
+const bk = pid => Math.floor(+pid / 9);                    // los datos de cada elección van en 6 paquetes de provincias
+const loadProv = async pid => (await jget(BASE + 'prov_b' + bk(pid) + '.json'))[pid];
+const loadMunMap = async pid => (await jget('mapas/mun.json'))[pid];
+const loadSecMap = async pid => { if (!G.sections) return null; try { return (await jget('mapas/sec/' + G.mapyear + '/b' + bk(pid) + '.json'))[pid] || null } catch (e) { return null } };
+function notesHTML() {
+  const src = G.sections ? 'Ministerio del Interior: resultados del Congreso por mesa. Cada mesa se agrega por sección censal, municipio y provincia; el voto CERA (residentes en el extranjero) cuenta solo a escala provincial.'
+    : 'Ministerio del Interior: resultados del Congreso por municipio y provincia. De esta elección no hay datos por mesa, así que no se puede bajar a sección censal.';
+  const my = G.sections ? `<div><b>Mapas.</b> Las secciones censales se dibujan con el seccionado del INE de ${G.mapyear}${G.year < 2001 ? ' (el más antiguo disponible; algunas secciones han cambiado desde entonces y no tienen polígono)' : ''}; los municipios, con los límites actuales, por lo que un municipio desaparecido o fusionado puede no aparecer dibujado.</div>` : '<div><b>Mapas.</b> Los municipios se dibujan con los límites actuales: un municipio desaparecido o fusionado desde entonces puede no aparecer dibujado.</div>';
+  return `<div><b>Fuente.</b> ${src}</div>${my}` + (G.notas || []).map(n => `<div>${esc(n)}</div>`).join('');
+}
 const AUTONOMAS = { '51': '51001', '52': '52001' };           // Ceuta y Melilla: van directas a municipio
 const DEF_PROV = '28', DEF_MUN = '28079';                         // Madrid por defecto
 const ABBR = { '15': 'COR', '27': 'LUG', '33': 'AST', '39': 'CAN', '48': 'BIZ', '20': 'GIP', '31': 'NAV', '17': 'GIR', '36': 'PON', '32': 'OUR', '24': 'LEO', '34': 'PAL', '09': 'BUR', '01': 'ALA', '26': 'RIO', '22': 'HUE', '25': 'LLE', '08': 'BCN', '49': 'ZAM', '47': 'VLL', '40': 'SEG', '42': 'SOR', '19': 'GUA', '50': 'ZAR', '43': 'TAR', '37': 'SAL', '05': 'AVI', '28': 'MAD', '16': 'CUE', '44': 'TER', '12': 'CAS', '10': 'CAC', '45': 'TOL', '13': 'CRE', '02': 'ALB', '46': 'VAL', '07': 'BAL', '06': 'BAD', '14': 'COD', '23': 'JAE', '30': 'MUR', '03': 'ALI', '21': 'HUV', '41': 'SEV', '29': 'MAL', '18': 'GRA', '04': 'ALM', '11': 'CAD', '35': 'LPA', '38': 'TFE', '51': 'CEU', '52': 'MEL' };
@@ -150,7 +157,7 @@ function drawProvMap(target, MAP, cfg) {
 
 /* ---- ranking de partidos para titulares ---- */
 const art = k => (G.parties[k].n === 'PP' || /^(Vox|Sumar|Junts|Podemos|CC|BNG)/i.test(G.parties[k].n)) ? '' : (G.parties[k].n === 'PSOE' ? 'el ' : '');
-const SEQ = ['PODEMOS', 'SUMAR', 'BILDU', 'BNG', 'CUP', 'ERC', 'NC', 'PSOE', 'JUNTS', 'PNV', 'CC', 'PP', 'UPN', 'EXISTE', 'SALF', 'VOX'];
+const SEQ = ['PSP', 'IU', 'ICV', 'ECP', 'PODEMOS', 'SUMAR', 'ENMAREA', 'COMPROMIS', 'MASPAIS', 'EQUO', 'HB', 'BILDU', 'EA', 'EE', 'BNG', 'CUP', 'ERC', 'NC', 'PA', 'PSOE', 'CHA', 'NABAI', 'JUNTS', 'CIU', 'PDECAT', 'PNV', 'CC', 'UV', 'PAR', 'PRC', 'TERUEL', 'CS', 'UPYD', 'CDS', 'UCD', 'PP', 'FAC', 'UPN', 'NAVARRASUMA', 'SALF', 'FN', 'VOX'];
 
 /* ---- barra fija: elección, provincia y municipio ---- */
 async function mountBar(curProv, curMun) {

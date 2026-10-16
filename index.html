@@ -21,7 +21,7 @@
   <section class="card" id="part"><div class="kpis k4" id="partk"></div></section>
   <div id="bar"></div>
 
-  <div class="cols">
+  <div class="cols vt">
     <section class="card">
       <h2>Voto</h2>
       <p class="note">% sobre votos válidos (incluye el voto en blanco), CERA incluido.</p>
@@ -30,8 +30,12 @@
     <section class="card">
       <h2>Escaños</h2>
       <p class="note">Reparto D'Hondt por provincia con umbral del 3 % en cada circunscripción. Mayoría absoluta: 176.</p>
-      <div class="hemi"><svg id="hemi" viewBox="0 0 400 214" role="img" aria-label="Hemiciclo de escaños"></svg><div class="mid"><div class="n" id="hemin">350</div><div class="lbl">escaños · mayoría 176</div></div></div>
+      <div class="seg2" role="group" aria-label="Vista de escaños"><button type="button" id="bParl" aria-pressed="true">Escaños en el parlamento</button><button type="button" id="bTerr" aria-pressed="false">Distribución territorial de escaños</button></div>
+      <div id="vParl">
+            <div class="hemi"><svg id="hemi" viewBox="0 0 400 214" role="img" aria-label="Hemiciclo de escaños"></svg><div class="mid"><div class="n" id="hemin">350</div><div class="lbl">escaños · mayoría 176</div></div></div>
       <table class="tbl" id="tbl"><thead><tr><th>Partido</th><th>Escaños</th><th>Votos</th><th>% voto</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div id="vTerr" hidden><p class="zoomrow"><button type="button" class="zoombtn" id="bZoom">⤢ Ampliar mapa</button></p><div class="emap"><svg id="emap" viewBox="0 0 536 337" role="img" aria-label="Mapa de la distribución territorial de escaños"></svg></div><div class="leg" id="eleg"></div><p class="note">Cada provincia se colorea con el partido más votado; cuanto más oscuro el tono, mayor su porcentaje de voto. Cada círculo es un escaño. Pulsa una provincia para ver su detalle.</p></div>
     </section>
   </div>
 
@@ -65,6 +69,7 @@
   <div class="notes" id="notes"></div>
 </div>
 <div class="tt" id="tt"></div>
+<div class="mbox" id="mbox" hidden role="dialog" aria-modal="true" aria-label="Mapa de escaños ampliado"><div class="mbar"><span>Distribución territorial de escaños</span><button type="button" id="bZoomX" aria-label="Cerrar">✕ Cerrar</button></div><div class="mbody"><svg id="emapBig" viewBox="0 0 536 337"></svg></div></div>
 <script src="js/lib.js"></script>
 <script>
 const ARTM = new Set(['PP', 'PSOE', 'PNV', 'BNG', 'CC', 'UPN', 'CUP']);
@@ -73,10 +78,7 @@ let MAP, sel = DEF_PROV;
 const AN = {};
 function groupsDef() {
   const K = {}; G.parties.forEach((p, i) => K[p.k] = i);
-  const g = (id, label, ks) => ({ id, label, idx: ks.map(k => K[k]).filter(i => i !== undefined) });
-  const DER = ['UPN', 'CC', 'PNV', 'SALF'], SOC = ['PODEMOS', 'ERC', 'JUNTS', 'BILDU', 'PNV', 'BNG', 'CC'];
-  return [g('pp', 'PP', ['PP']), g('ppv', 'PP + Vox', ['PP', 'VOX']), g('ppvd', 'PP + Vox + derecha (UPN, CC, PNV)', ['PP', 'VOX', ...DER]), g('ppvdj', 'PP + Vox + derecha + Junts', ['PP', 'VOX', ...DER, 'JUNTS']),
-    g('soc', 'PSOE + Sumar + socios de investidura', ['PSOE', 'SUMAR', ...SOC]), g('socsj', 'PSOE + Sumar + socios sin Junts', ['PSOE', 'SUMAR', ...SOC.filter(x => x !== 'JUNTS')]), g('ps', 'PSOE + Sumar', ['PSOE', 'SUMAR']), g('p', 'Solo PSOE', ['PSOE'])];
+  return G.groups.map(g => ({ id: g.id, label: g.label, idx: g.keys.map(k => K[k]).filter(i => i !== undefined) }));
 }
 function partic() {
   const n = G.nat, vc = n.v.reduce((a, b) => a + b, 0), vt = vc + n.bl + n.nu;
@@ -110,6 +112,59 @@ function groups() {
     return `<div class="grow"><div><div class="gt">${esc(g.label)}</div><div class="gs"><b>${t}</b> escaños · ${t >= 176 ? `mayoría absoluta (${t - 175} por encima del umbral)` : `a ${176 - t} de la mayoría absoluta`}</div></div>
     <svg class="gsvg" viewBox="0 0 ${VW} 70" role="img" aria-label="${esc(g.label)}: ${t} escaños"><rect x="${X0}" y="40" width="${(tot * SC).toFixed(1)}" height="26" fill="var(--track)"/>${rects}${mark}${labels}</svg></div>`;
   }).join('');
+}
+
+const MPAL = { PP: '#1ca5ee', PSOE: '#f11828', VOX: '#73cc33', SUMAR: '#ef4b91', ERC: '#ffb232', JUNTS: '#00c7ae', BILDU: '#00ac8e', PNV: '#4aae4a', BNG: '#adcfef', CC: '#ffd700', UPN: '#00599b' };
+const MLAD = { PP: ['#b0dff9', '#7eccf5', '#4db8f2', '#1ca5ee', '#0f86c6', '#0b6595', '#074363'], PSOE: ['#fbaeb4', '#f87c86', '#f44a57', '#f11828', '#c90c1a', '#970913', '#64060e'], VOX: ['#b8ec92', '#9ce567', '#7fdd3b', '#66c422', '#4f981a', '#396d13', '#22410b'], PNV: ['#c2e7c2', '#9cd89c', '#76c976', '#50ba50', '#3c993c', '#2d732d', '#1e4d1e'] };
+const mcol = i => MPAL[G.parties[i].k] || G.parties[i].c;
+function mix(h, t, f) { const n = [1, 3, 5].map(k => parseInt(h.substr(k, 2), 16)); return '#' + n.map(v => Math.round(v + (t - v) * f).toString(16).padStart(2, '0')).join('') }
+function mshade(i, tier) { const k = G.parties[i].k; if (MLAD[k]) return MLAD[k][tier]; const b = mcol(i); return tier < 3 ? mix(b, 255, [.65, .43, .22][tier]) : tier > 3 ? mix(b, 0, [.19, .39, .59][tier - 4]) : b }
+let EM = null;
+function arcP(cx, cy, r1, r2, a0, a1) {
+  if (a1 - a0 >= 2 * Math.PI - 1e-6) a1 = a0 + 2 * Math.PI - 1e-4;
+  const P = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)], big = a1 - a0 > Math.PI ? 1 : 0;
+  const [x1, y1] = P(r2, a0), [x2, y2] = P(r2, a1), [x3, y3] = P(r1, a1), [x4, y4] = P(r1, a0);
+  const f = v => v.toFixed(2);
+  return r1 > 0 ? `M${f(x1)},${f(y1)}A${r2},${r2} 0 ${big} 1 ${f(x2)},${f(y2)}L${f(x3)},${f(y3)}A${r1},${r1} 0 ${big} 0 ${f(x4)},${f(y4)}Z` : `M${cx},${cy}L${f(x1)},${f(y1)}A${r2},${r2} 0 ${big} 1 ${f(x2)},${f(y2)}Z`
+}
+function lum(h) { const n = [1, 3, 5].map(k => parseInt(h.substr(k, 2), 16) / 255).map(v => v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4)); return .2126 * n[0] + .7152 * n[1] + .0722 * n[2] }
+function terrView() {
+  if (!EM) return;
+  const T = EM, f1 = v => (+v).toFixed(2), COLS = n => n <= 4 ? Math.min(n, 2) : n <= 6 ? 3 : n <= 12 ? 4 : n <= 18 ? 6 : 10, SP = 6.45;
+  let fills = '', circ = '', labs = '';
+  G.prov.forEach(p => {
+    const t = T.prov[p.id]; if (!t) return;
+    const tot = p.v.reduce((a, b) => a + b, 0) + p.bl; let w = -1;
+    p.v.forEach((v, i) => { if (v > 0 && (w < 0 || v > p.v[w])) w = i });
+    const tier = w < 0 ? 0 : Math.min(6, Math.max(0, Math.floor(p.v[w] / tot * 100 / 5) - 4));
+    const fc = w < 0 ? '#cccccc' : mshade(w, tier), tr = t.can ? ` transform="translate(${T.can[0]},${T.can[1]})"` : '';
+    const seats = G.parties.map((x, i) => i).filter(i => p.es[i] > 0).sort((a, b) => p.es[b] - p.es[a] || p.v[b] - p.v[a]);
+    const tip = `${t.n} · ${p.s} ${p.s === 1 ? 'escaño' : 'escaños'}${w >= 0 ? ' · más votado: ' + G.parties[w].n + ' (' + fmt(p.v[w] / tot) + ')' : ''}${seats.length ? ' · ' + seats.map(i => G.parties[i].n + ' ' + p.es[i]).join(', ') : ''}`;
+    fills += `<path class="ep" data-id="${p.id}" d="${t.d}"${tr} fill="${fc}"><title>${esc(tip)}</title></path>`;
+    const list = []; seats.forEach(i => { for (let k = 0; k < p.es[i]; k++) list.push(i) });
+    const n = list.length, cols = COLS(n), rows = Math.ceil(n / cols); let c = '', q = 0;
+    for (let r = 0; r < rows; r++) { const cnt = r < rows - 1 ? cols : n - cols * (rows - 1);
+      for (let j = 0; j < cnt; j++) c += `<circle cx="${f1(t.a[0] + (j - (cnt - 1) / 2) * SP)}" cy="${f1(t.a[1] + r * SP)}" r="2.77" fill="${mshade(list[q], 3)}"/>`, q++ }
+    circ += `<g${tr} pointer-events="none">${c}</g>`;
+    if (t.l) labs += `<text${tr} x="${t.l[0]}" y="${t.l[1]}" fill="${tier === 6 || lum(fc) < .1 ? '#fff' : '#000'}">${t.lt ? t.lt.map((x, k) => `<tspan x="${t.l[0]}" dy="${k ? 4.667 : 0}">${esc(x)}</tspan>`).join('') : esc(t.n)}</text>`;
+  });
+  const lines = T.lines.map(l => `<line x1="${l[0]}" y1="${l[1]}" x2="${l[2]}" y2="${l[3]}"/>`).join('');
+  // sectores: votos (círculo) y escaños (anillo)
+  const pc = T.pie.c, vs = G.nat.v, tv = vs.reduce((a, b) => a + b, 0), es = G.nat.es, te = es.reduce((a, b) => a + b, 0);
+  const ord = G.parties.map((x, i) => i).filter(i => vs[i] > 0).sort((a, b) => vs[b] - vs[a]);
+  let minor = 0, sl = [], a = Math.PI / 2; ord.forEach(i => { if (vs[i] / tv >= 0.004 || G.parties[i].k in MPAL) sl.push(i); else minor += vs[i] });
+  let pie = '', ring = '';
+  sl.forEach(i => { const b = a + vs[i] / tv * 2 * Math.PI; pie += `<path d="${arcP(pc[0], pc[1], 0, T.pie.r, a, b)}" fill="${mcol(i)}"><title>${esc(G.parties[i].n)}: ${fmt(vs[i] / tv)}</title></path>`; a = b });
+  if (minor > 0) { const b = a + minor / tv * 2 * Math.PI; pie += `<path d="${arcP(pc[0], pc[1], 0, T.pie.r, a, b)}" fill="#808080"><title>Otros: ${fmt(minor / tv)}</title></path>` }
+  a = Math.PI / 2; G.parties.map((x, i) => i).filter(i => es[i] > 0).sort((x, y) => es[y] - es[x] || vs[y] - vs[x]).forEach(i => { const b = a + es[i] / te * 2 * Math.PI; ring += `<path d="${arcP(pc[0], pc[1], T.pie.r, T.pie.r2, a, b)}" fill="${mcol(i)}"><title>${esc(G.parties[i].n)}: ${es[i]} escaños</title></path>`; a = b });
+  const svgH = `<g class="efills">${fills}</g>${circ}<g class="elab">${labs}</g><g class="elin">${lines}</g><text class="east" x="${T.ast[0]}" y="${T.ast[1]}">*</text><g>${ring}${pie}<circle cx="${pc[0]}" cy="${pc[1]}" r="${T.pie.r}" fill="none" stroke="#fff" stroke-width=".94"/></g><text class="evot" x="${T.vot[0]}" y="${T.vot[1]}">Votos</text>`;
+  ['#emap', '#emapBig'].forEach(q => { $(q).innerHTML = svgH; $(q).querySelectorAll('.ep').forEach(p => p.onclick = () => nav(hProv(p.dataset.id))) });
+  const used = G.parties.map((x, i) => i).filter(i => es[i] > 0).sort((x, y) => es[y] - es[x]);
+  $('#eleg').innerHTML = used.map(i => `<span><i style="background:${mcol(i)}"></i>${esc(G.parties[i].n)} ${es[i]}</span>`).join('');
+}
+function terrToggle(on) {
+  $('#vParl').hidden = on;  $('#vTerr').hidden = !on; $('#bParl').setAttribute('aria-pressed', !on); $('#bTerr').setAttribute('aria-pressed', on);
+  if (on && !EM) jget('mapas/escanos.json').then(t => { EM = t; terrView() }).catch(() => { $('#eleg').textContent = 'No se pudo cargar el mapa.' });
 }
 function an(id) { return AN[id] || (AN[id] = analyze(G.prov[G.pi[id]])) }
 function winSeats(id) { const p = G.prov[G.pi[id]], a = an(id); let b = -1; for (const i of a.order) if (b < 0 || a.es[i] > a.es[b] || (a.es[i] === a.es[b] && p.v[i] > p.v[b])) b = i; return b }
@@ -170,11 +225,14 @@ function thrChart() {
 }
 (async () => {
   try {
-    await loadG(); MAP = await jget('mapas/provincias.json');
+    await loadG(); MAP = await jget('mapas/provincias.json'); if (!G.sections) $('#bMun').title = 'Resultados de un municipio';
     partic(); votes(); seatsView(); groups(); tiles(); detail(); lastSeats(); thrChart();
+    const zoom = on => { $('#mbox').hidden = !on; document.body.style.overflow = on ? 'hidden' : ''; if (on) $('#bZoomX').focus() };
+    $('#bZoom').onclick = () => zoom(true); $('#bZoomX').onclick = () => zoom(false); document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#mbox').hidden) zoom(false) });
+    $('#bParl').onclick = () => terrToggle(false); $('#bTerr').onclick = () => terrToggle(true);
     await mountBar('');
     $('#bMun').href = hMun(DEF_MUN);
-    $('#notes').innerHTML = '<div><b>Fuente.</b> Ministerio del Interior: resultados del Congreso por mesa. Cada mesa se agrega por sección censal, municipio y provincia; el voto CERA (residentes en el extranjero) cuenta solo a escala provincial.</div>';
+    $('#notes').innerHTML = notesHTML(); document.title = 'Elecciones al Congreso ' + G.year + (G.id.slice(5) === '04' ? ' (abril)' : G.id === '2019-11' ? ' (noviembre)' : '');
   } catch (e) { $('#notes').textContent = 'No se pudieron cargar los datos: ' + e }
 })();
 </script>

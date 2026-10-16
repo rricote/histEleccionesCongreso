@@ -402,3 +402,24 @@ small.gd,td.gd{color:var(--good)}small.bd,td.bd{color:var(--bad)}
 .pbt tr.rw:hover td{background:var(--track)}
 #pbcard .toolrow{margin:4px 0 8px}
 .upanel .up-act{margin:0 0 14px}
+
+.emap{background:#fff;border-radius:8px;padding:8px;margin-top:4px}.emap svg{width:100%;height:auto;display:block}
+.emap .ep{cursor:pointer;stroke:none}.emap .ep:hover{filter:brightness(1.12)}
+.emap circle{stroke:#000;stroke-width:.253}
+.emap .elab text,.emap .elab{font:700 4.667px Arial,Helvetica,sans-serif;text-anchor:middle;pointer-events:none}
+.emap .elin line{stroke:#000;stroke-width:.55;stroke-linecap:round}
+.emap .east{fill:#fff;font:700 23.56px Arial,Helvetica,sans-serif;text-anchor:middle;pointer-events:none}
+.emap .evot{fill:#555;font:700 5.6px Arial,Helvetica,sans-serif}
+@media(min-width:861px){.cols.vt{grid-template-columns:minmax(0,3fr) minmax(0,7fr)}}
+
+.zoomrow{margin:0 0 6px}.zoombtn{font:500 13px var(--f-body);border:1px solid var(--rule);background:var(--surface);color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer}.zoombtn:hover{border-color:var(--ink)}
+.mbox{position:fixed;inset:0;z-index:50;background:#fff;display:flex;flex-direction:column}.mbox[hidden]{display:none}
+.mbar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #dce1e8;color:#10151c;font:600 14px var(--f-body)}
+.mbar button{font:500 13px var(--f-body);border:1px solid #10151c;background:#10151c;color:#fff;padding:7px 14px;border-radius:5px;cursor:pointer}
+.mbody{flex:1;min-height:0;padding:8px}.mbody svg{width:100%;height:100%;display:block}
+.mbody .ep{cursor:pointer;stroke:none}.mbody .ep:hover{filter:brightness(1.12)}
+.mbody circle{stroke:#000;stroke-width:.253}
+.mbody .elab,.mbody .elab text{font:700 4.667px Arial,Helvetica,sans-serif;text-anchor:middle;pointer-events:none}
+.mbody .elin line{stroke:#000;stroke-width:.55;stroke-linecap:round}
+.mbody .east{fill:#fff;font:700 23.56px Arial,Helvetica,sans-serif;text-anchor:middle;pointer-events:none}
+.mbody .evot{fill:#555;font:700 5.6px Arial,Helvetica,sans-serif}

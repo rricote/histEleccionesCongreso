@@ -84,7 +84,7 @@ function map() {
     $('#mapn').textContent = COL < 0 ? 'Color: partido más votado en cada sección; cuanto más pálido, menor la ventaja sobre el segundo.' : `Color: % de voto de ${G.parties[COL].n} en cada sección (más intenso = mayor porcentaje dentro de este municipio).`;
     legend(S);
     const missing = S.filter(s => !shapes.some(x => x[0] === s.key)).length;
-    $('#mapnote').innerHTML = missing ? `${missing} ${missing === 1 ? 'sección' : 'secciones'} sin polígono en el seccionado del INE (renumeradas entre enero y julio de 2023): sus votos cuentan en el municipio y en la tabla.` : '';
+    $('#mapnote').innerHTML = missing ? `${missing} ${missing === 1 ? 'sección' : 'secciones'} sin polígono en el seccionado del INE de ${G.mapyear}${G.year < 2001 ? ' (el más antiguo disponible)' : ''}: sus votos cuentan en el municipio y en la tabla.` : '';
     const oldp = document.getElementById('upanel'); if (oldp) oldp.remove();
     attachPanel(svg, 'path[data-k]', 'k', k => { const s = byKey[k]; if (!s) return null;
       return { title: secName(s.cus), meta: `${AUTO ? esc(MU.n) : esc(MU.n)} · ${nf(s.censo)} electores`, v: s.v, bl: s.bl, nu: s.nu, censo: s.censo, ref: { v: MU.v, bl: MU.bl }, refName: 'el municipio',
@@ -99,7 +99,7 @@ function map() {
     const cur = svg.querySelector('path.cur'); if (cur) svg.appendChild(cur);
     svg.querySelectorAll('path[data-m]').forEach(p => { const go = () => { if (p.dataset.m !== MID) nav(hMun(p.dataset.m)) }; p.onclick = go; p.onkeydown = e => { if (e.key === 'Enter') go() } });
     $('#mapn').textContent = (COL < 0 ? 'Color: partido más votado en cada municipio de la provincia' : `Color: % de voto de ${G.parties[COL].n} en cada municipio`) + `. El municipio de ${MU.n} aparece con el borde marcado; pulsa otro para cambiar.`;
-    legend(M.filter(m => m.w)); $('#mapnote').textContent = '';
+    legend(M.filter(m => m.w)); $('#mapnote').textContent = MUNJ.ms.some(x => x[0] === C3) ? '' : 'Este municipio no figura en los límites municipales actuales (desaparecido o fusionado): sus votos cuentan en la tabla y en la provincia.';
   }
 }
 function hl(k, scroll) {
@@ -143,22 +143,23 @@ function stable() {
   $('#stab').querySelectorAll('tr.rw').forEach(t => { t.onmouseenter = () => hl(t.dataset.k, false); t.onmouseleave = () => hl(null, false) });
   if (HL) hl(HL);
 }
-function setCol(v) { COL = v; if (COL >= 0) SORT = { k: 'p' + COL, d: -1 }; else if (/^p\d+$/.test(SORT.k)) SORT = { k: 'cus', d: 1 }; map(); stable() }
+function setCol(v) { COL = v; if (COL >= 0) SORT = { k: 'p' + COL, d: -1 }; else if (/^p\d+$/.test(SORT.k)) SORT = { k: 'cus', d: 1 }; map(); if (G.sections) stable() }
 (async () => {
   try {
     await loadG(); P = G.prov[G.pi[PID]];
-    [PJ, MUNJ] = await Promise.all([jget(BASE + 'prov_' + PID + '.json'), jget('mapas/mun_' + PID + '.json')]);
-    try { SECJ = await jget('mapas/sec_' + PID + '.json') } catch (e) { SECJ = null }
+    [PJ, MUNJ] = await Promise.all([loadProv(PID), loadMunMap(PID)]);
+    SECJ = await loadSecMap(PID);
+    if (!G.sections) { VIEW = 'mun'; document.querySelector('.seg2').style.display = 'none'; document.querySelector('.tabs').style.display = 'none' }
     build(); if (!MU) throw new Error('Municipio no encontrado: ' + MID);
     setPill(); document.title = MU.n + ' · resultados por municipio';
     crumbs(AUTO ? [{ t: 'General', h: href('index.html') }, { l: 'Municipio', t: MU.n }] : [{ t: 'General', h: href('index.html') }, { l: 'Provincia', t: P.n, h: hProv(PID) }, { l: 'Municipio', t: MU.n }]);
-    await mountBar(PID, `${MU.n} · ${P.n}`); mountTabs();
+    await mountBar(PID, `${MU.n} · ${P.n}`); if (G.sections) mountTabs();
     const top = MU.v.map((x, i) => i).filter(i => MU.v[i] > 0).sort((a, b) => MU.v[b] - MU.v[a]).slice(0, 12);
     $('#colSel').innerHTML = '<option value="-1">Partido más votado</option>' + top.map(i => `<option value="${i}">% de ${esc(G.parties[i].n)}</option>`).join('');
     $('#colSel').onchange = e => setCol(+e.target.value);
     $('#vSec').onclick = () => { VIEW = 'sec'; map() }; $('#vMun').onclick = () => { VIEW = 'mun'; map() };
-    map(); detail(); stable(); pblock();
-    $('#notes').innerHTML = '<div><b>Fuente.</b> Ministerio del Interior: resultados del Congreso por mesa. Cada mesa se agrega por sección censal, municipio y provincia; el voto CERA (residentes en el extranjero) cuenta solo a escala provincial.</div>';
+    map(); detail(); if (G.sections) { stable(); pblock() }
+    $('#notes').innerHTML = notesHTML();
   } catch (e) { console.error(e) }
 })();
 </script>
