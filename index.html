@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Resultados finales de las elecciones generales de España por mesa, sección censal, municipio y provincia.">
+<title>Elecciones al Congreso de los Diputados</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1 class="sitetitle"><a href="index.html">Elecciones al Congreso de los Diputados</a></h1>
+  <div class="topbar">
+    <nav class="crumbs" id="crumbs" aria-label="Migas de pan"><span class="cur">General</span></nav>
+    <div class="navbtns">
+      <a class="btnlk" id="bProv" href="provincia.html">Vista por provincia →</a>
+      <a class="btnlk ghost" id="bMun" href="municipio.html">Vista por municipio →</a>
+    </div>
+  </div>
+  <section class="card" id="part"><div class="kpis k4" id="partk"></div></section>
+  <div id="bar"></div>
+
+  <div class="cols">
+    <section class="card">
+      <h2>Voto</h2>
+      <p class="note">% sobre votos válidos (incluye el voto en blanco), CERA incluido.</p>
+      <div class="rows" id="votes"></div>
+    </section>
+    <section class="card">
+      <h2>Escaños</h2>
+      <p class="note">Reparto D'Hondt por provincia con umbral del 3 % en cada circunscripción. Mayoría absoluta: 176.</p>
+      <div class="hemi"><svg id="hemi" viewBox="0 0 400 214" role="img" aria-label="Hemiciclo de escaños"></svg><div class="mid"><div class="n" id="hemin">350</div><div class="lbl">escaños · mayoría 176</div></div></div>
+      <table class="tbl" id="tbl"><thead><tr><th>Partido</th><th>Escaños</th><th>Votos</th><th>% voto</th></tr></thead><tbody></tbody></table>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Mayorías posibles</h2>
+    <p class="note">Suma de escaños de cada combinación. La línea marca la mayoría absoluta (176).</p>
+    <div id="groups"></div>
+  </section>
+
+  <div class="mapwrap bigmap">
+    <section class="card">
+      <h2>Quién lidera cada provincia</h2>
+      <p class="note">Color: partido con más escaños; cuanto más pálido, menor la ventaja en votos sobre el segundo. Ceuta y Melilla (cuadrados) abren directamente la vista de municipio; Canarias va en su recuadro. Pasa el ratón para ver un resumen y pulsa para entrar.</p>
+      <div id="tiles"></div><div class="leg" id="mleg"></div>
+    </section>
+    <section class="card pd" id="pd"></section>
+  </div>
+
+  <section class="card">
+    <h2>El último escaño de cada provincia</h2>
+    <p class="note">El último escaño que se reparte en cada provincia es el que más se juega. Cada cuadrado es un rival y su posición indica cuántos puntos de voto le habrían faltado para quitárselo al partido que lo tiene (con el resto de partidos reducidos en proporción). Aparecen las provincias con un rival a menos de 4 puntos, de más a menos ajustadas.</p>
+    <div class="ls" id="disp"></div>
+  </section>
+
+  <section class="card">
+    <h2>Barrera electoral efectiva por provincia</h2>
+    <p class="note">Voto provincial que habría necesitado un partido nuevo para sacar el primer escaño, con los demás partidos reducidos en proporción (D'Hondt sobre el resultado final). Se muestra la barrera real sin aplicar el 3 % legal: en Madrid y Barcelona queda por debajo de la línea de puntos, es decir, el 3 % es lo que de verdad les exige la ley. Arriba del todo, los escaños de la provincia; sobre cada barra, su barrera en %. Ceuta y Melilla (un escaño) no se muestran. Pulsa una barra para ver la provincia.</p>
+    <div class="tw"><svg id="thr" role="img" aria-label="Barrera electoral efectiva por provincia"></svg></div>
+  </section>
+
+  <div class="notes" id="notes"></div>
+</div>
+<div class="tt" id="tt"></div>
+<script src="js/lib.js"></script>
+<script>
+const ARTM = new Set(['PP', 'PSOE', 'PNV', 'BNG', 'CC', 'UPN', 'CUP']);
+const wa = i => (ARTM.has(G.parties[i].k) ? 'el ' : '') + G.parties[i].n;
+let MAP, sel = DEF_PROV;
+const AN = {};
+function groupsDef() {
+  const K = {}; G.parties.forEach((p, i) => K[p.k] = i);
+  const g = (id, label, ks) => ({ id, label, idx: ks.map(k => K[k]).filter(i => i !== undefined) });
+  const DER = ['UPN', 'CC', 'PNV', 'SALF'], SOC = ['PODEMOS', 'ERC', 'JUNTS', 'BILDU', 'PNV', 'BNG', 'CC'];
+  return [g('pp', 'PP', ['PP']), g('ppv', 'PP + Vox', ['PP', 'VOX']), g('ppvd', 'PP + Vox + derecha (UPN, CC, PNV)', ['PP', 'VOX', ...DER]), g('ppvdj', 'PP + Vox + derecha + Junts', ['PP', 'VOX', ...DER, 'JUNTS']),
+    g('soc', 'PSOE + Sumar + socios de investidura', ['PSOE', 'SUMAR', ...SOC]), g('socsj', 'PSOE + Sumar + socios sin Junts', ['PSOE', 'SUMAR', ...SOC.filter(x => x !== 'JUNTS')]), g('ps', 'PSOE + Sumar', ['PSOE', 'SUMAR']), g('p', 'Solo PSOE', ['PSOE'])];
+}
+function partic() {
+  const n = G.nat, vc = n.v.reduce((a, b) => a + b, 0), vt = vc + n.bl + n.nu;
+  $('#partk').innerHTML = `<div><b>${fmt(vt / n.censo)}</b><span>participación sobre el censo</span></div><div><b>${nf(n.censo)}</b><span>electores</span></div><div><b>${nf(vt)}</b><span>votantes (${nf(vc + n.bl)} votos válidos)</span></div><div><b>${nf(n.nu)}</b><span>votos nulos · ${nf(n.bl)} en blanco</span></div>`;
+}
+function votes() { voteBars('#votes', G.nat.v, G.nat.bl, G.nat.nu, G.nat.censo, 11) }
+function seatsView() {
+  const es = G.nat.es, tot = es.reduce((a, b) => a + b, 0), keyOrder = k => { const j = SEQ.indexOf(k); return j < 0 ? SEQ.indexOf('PP') - 0.5 : j };
+  const list = []; G.parties.map((p, i) => i).filter(i => es[i] > 0).sort((a, b) => keyOrder(G.parties[a].k) - keyOrder(G.parties[b].k)).forEach(i => { for (let n = 0; n < es[i]; n++) list.push(i) });
+  const rows = 9, cx = 200, cy = 200, r0 = 82, R = 190, radii = [...Array(rows)].map((_, k) => r0 + (R - r0) * k / (rows - 1)), sr = radii.reduce((a, b) => a + b, 0);
+  let cnt = radii.map(r => Math.round(tot * r / sr)); cnt[rows - 1] += tot - cnt.reduce((a, b) => a + b, 0);
+  const p = []; radii.forEach((r, k) => { for (let j = 0; j < cnt[k]; j++) p.push([Math.PI - Math.PI * (cnt[k] === 1 ? .5 : j / (cnt[k] - 1)), r]) });
+  p.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  $('#hemi').innerHTML = p.map((q, n) => { const i = list[n]; return i === undefined ? '' : `<circle cx="${(cx + q[1] * Math.cos(q[0])).toFixed(1)}" cy="${(cy - q[1] * Math.sin(q[0])).toFixed(1)}" r="4.5" fill="${pcol(i)}"/>` }).join('');
+  $('#hemin').textContent = tot;
+  const valid = G.nat.v.reduce((a, b) => a + b, 0) + G.nat.bl;
+  $('#tbl tbody').innerHTML = G.parties.map((x, i) => i).filter(i => es[i] > 0).sort((a, b) => es[b] - es[a] || G.nat.v[b] - G.nat.v[a])
+    .map(i => `<tr><td>${swatch(i)}${esc(G.parties[i].n)}</td><td class="s">${es[i]}</td><td class="r">${nf(G.nat.v[i])}</td><td class="r">${fmt(G.nat.v[i] / valid)}</td></tr>`).join('');
+}
+function groups() {
+  const es = G.nat.es, tot = es.reduce((a, b) => a + b, 0), VW = 700, X0 = 2, SC = (VW - 4) / tot, xs = n => X0 + n * SC;
+  $('#groups').innerHTML = groupsDef().map(g => {
+    const segs = g.idx.filter(i => es[i] > 0).map(i => ({ i, n: es[i] })).sort((a, b) => b.n - a.n), t = segs.reduce((a, s) => a + s.n, 0);
+    let x = 0, rects = '', labels = ''; const rowEnd = [-1e9, -1e9];
+    segs.forEach(sg => { const w = sg.n * SC, x1 = xs(x); rects += `<rect x="${x1.toFixed(1)}" y="40" width="${Math.max(w, 0.8).toFixed(1)}" height="26" fill="${pcol(sg.i)}" stroke="var(--surface)" stroke-width="1"><title>${esc(G.parties[sg.i].n)}: ${sg.n}</title></rect>`;
+      const big = w >= 34, fs = big ? 15 : 11, tw = String(sg.n).length * fs * 0.62, cxm = x1 + w / 2; let r = 0;
+      if (cxm - tw / 2 < rowEnd[0] + 2) r = 1; if (r === 1 && cxm - tw / 2 < rowEnd[1] + 2) r = 2;
+      const y = r === 0 ? 34 : r === 1 ? 21 : 8; if (r < 2) rowEnd[r] = cxm + tw / 2;
+      labels += `<text x="${cxm.toFixed(1)}" y="${y}" text-anchor="middle" font-size="${fs}" font-weight="${big ? 700 : 600}" fill="${pcol(sg.i)}" stroke="var(--surface)" stroke-width="3.5" paint-order="stroke" stroke-linejoin="round">${sg.n}</text>`; x += sg.n });
+    const mx = xs(176), mark = `<line x1="${mx}" x2="${mx}" y1="4" y2="68" stroke="var(--ink)" stroke-width="1.5"/><text x="${mx + 5}" y="9" font-size="10.5" font-weight="600" fill="var(--ink)" letter-spacing=".04em">176 MAYORÍA ABSOLUTA</text>`;
+    return `<div class="grow"><div><div class="gt">${esc(g.label)}</div><div class="gs"><b>${t}</b> escaños · ${t >= 176 ? `mayoría absoluta (${t - 175} por encima del umbral)` : `a ${176 - t} de la mayoría absoluta`}</div></div>
+    <svg class="gsvg" viewBox="0 0 ${VW} 70" role="img" aria-label="${esc(g.label)}: ${t} escaños"><rect x="${X0}" y="40" width="${(tot * SC).toFixed(1)}" height="26" fill="var(--track)"/>${rects}${mark}${labels}</svg></div>`;
+  }).join('');
+}
+function an(id) { return AN[id] || (AN[id] = analyze(G.prov[G.pi[id]])) }
+function winSeats(id) { const p = G.prov[G.pi[id]], a = an(id); let b = -1; for (const i of a.order) if (b < 0 || a.es[i] > a.es[b] || (a.es[i] === a.es[b] && p.v[i] > p.v[b])) b = i; return b }
+function tiles() {
+  drawProvMap('#tiles', MAP, { sel, pick: id => { nav(hProv(id)) }, hover: id => { if (sel !== id) { sel = id; tiles(); detail() } },
+    style: id => { const p = G.prov[G.pi[id]], w = winOf(p.v, p.bl); const b = winSeats(id); return shade(b, w ? w.m : 0, 0.22) },
+    title: id => { const p = G.prov[G.pi[id]], b = winSeats(id); return `${p.n} · ${G.parties[b].n} (${an(id).es[b]} de ${p.s})` } });
+  const used = new Set(G.prov.map(p => winSeats(p.id)));
+  $('#mleg').innerHTML = [...used].map(i => `<span><i style="background:${pcol(i)}"></i>${esc(G.parties[i].n)}</span>`).join('') + '<span>Más pálido = ventaja más corta</span>';
+}
+function detail() {
+  const p = G.prov[G.pi[sel]], a = an(sel), auto = !!AUTONOMAS[sel];
+  $('#bProv').href = hProv(sel); $('#bProv').textContent = auto ? 'Vista de municipio →' : 'Vista por provincia →';
+  const idx = a.order.filter(i => a.es[i] > 0 || a.row[i] >= 0.01).slice(0, 9);
+  $('#pd').innerHTML = `<h3>${esc(p.n)}</h3><div class="meta">${p.s} ${p.s === 1 ? 'escaño' : 'escaños'} · ${esc(G.ccaa.find(c => c.id === p.cc)?.n || '')} · ${nf((a.valid - p.bl) / 1e6, 2)} M de votos a candidaturas</div>
+  <table class="tbl"><thead><tr><th>Partido</th><th>Voto</th><th>Votos</th><th>Escaños</th></tr></thead><tbody>${idx.map(i => `<tr><td>${swatch(i)}${esc(G.parties[i].n)}</td><td class="d" style="color:var(--ink)">${fmt(a.row[i])}</td><td class="d">${nf(p.v[i])}</td><td class="s">${a.es[i]}</td></tr>`).join('')}</tbody></table>
+  <p style="margin:14px 0 0"><a class="btnlk" href="${hProv(sel)}">Ver ${auto ? 'el municipio de ' : 'la provincia de '}${esc(p.n)} →</a></p>`;
+}
+function lastSeats() {
+  const MAXG = 4, L = [];
+  G.prov.forEach(p => {
+    if (p.s < 2 || AUTONOMAS[p.id]) return; const a = an(p.id); if (!a.lastW) return; const h = a.lastW.k, gaps = [];
+    a.order.filter(i => i !== h).slice(0, 10).forEach(i => { const nd = needShare(a.row, i, p.s, a.es[i] + 1); if (nd !== null) gaps.push([i, (nd - a.row[i]) * 100, (nd - a.row[i]) * a.valid]) });
+    gaps.sort((x, y) => x[1] - y[1]); if (gaps.length && gaps[0][1] <= MAXG) L.push({ p, h, gaps: gaps.filter(g => g[1] <= MAXG).slice(0, 4) });
+  });
+  L.sort((x, y) => x.gaps[0][1] - y.gaps[0][1]);
+  const fm = x => x.toFixed(2).replace('.', ','), xx = g => (1 - Math.min(g, MAXG) / MAXG) * 100;
+  const ticks = [4, 3, 2, 1, 0].map(v => `<span class="${v % 2 ? 'o' : ''}" style="left:${(1 - v / MAXG) * 100}%">${v === 0 ? 'empate' : 'a ' + v + ' pts'}</span>`).join('');
+  let h = `<div class="ax"><span>Provincia</span><div class="tk">${ticks}</div><span class="hh">Tiene el último escaño</span></div>`;
+  L.forEach(d => {
+    const g0 = d.gaps[0], pos = xx(g0[1]), al = pos > 70 ? `right:${100 - pos}%;text-align:right` : `left:${pos}%;transform:translateX(-50%)`;
+    const sq = d.gaps.slice().reverse().map(g => `<span class="sq" style="left:${xx(g[1])}%;background:${pcol(g[0])}" title="${esc(G.parties[g[0]].n)} a ${fm(g[1])} pts · unos ${nf(Math.ceil(g[2] / 10) * 10)} votos"></span>`).join('');
+    h += `<button type="button" class="row" data-id="${d.p.id}"><span class="nm"><b>${esc(d.p.n)}</b><small>${d.p.s} escaños</small></span><span class="tr">${[1, 2, 3].map(v => `<span class="g" style="left:${xx(v)}%"></span>`).join('')}${sq}<span class="lb" style="color:${pcol(g0[0])};${al}">${esc(G.parties[g0[0]].n.toUpperCase())} a ${fm(g0[1])} pts · ${nf(Math.ceil(g0[2] / 10) * 10)} votos</span></span><span class="hd" style="color:${pcol(d.h)}">${esc(G.parties[d.h].n)}</span></button>`;
+  });
+  $('#disp').innerHTML = L.length ? h : '<p class="note">Ninguna provincia tuvo un rival a menos de 4 puntos del último escaño.</p>';
+  $('#disp').querySelectorAll('.row').forEach(b => b.onclick = () => { nav(hProv(b.dataset.id)) });
+}
+function thrChart() {
+  const svg = $('#thr'), SHORT = { 'Santa Cruz de Tenerife': 'S.C. Tenerife', 'Castelló/Castellón': 'Castelló', 'Alacant/Alicante': 'Alicante', 'València/Valencia': 'València', 'Araba/Álava': 'Araba', 'Illes Balears': 'Baleares' }, nm = p => SHORT[p.n] || p.n;
+  const L = G.prov.filter(p => !AUTONOMAS[p.id]).map(p => ({ p, v: effThreshold(an(p.id).row, p.s) })).filter(x => x.v !== null);
+  L.sort((a, b) => a.v - b.v || b.p.s - a.p.s);
+  const n = L.length, W = Math.max(900, n * 26 + 66), H = 410, m = { l: 56, r: 10, t: 44, b: 96 };
+  const top = Math.ceil(Math.max(...L.map(x => x.v)) * 20) / 20, Y = v => H - m.b - v / top * (H - m.t - m.b), bw = (W - m.l - m.r) / n;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.style.minWidth = W + 'px'; svg.style.width = '100%';
+  let s = ''; const st1 = top > 0.3 ? 0.1 : 0.05;
+  for (let v = 0; v <= top + 1e-9; v += st1) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--rule)"/><text x="${m.l - 7}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${Math.round(v * 100)}%</text>`;
+  L.forEach((x, i) => {
+    const cx = m.l + bw * (i + .5), h = Y(0) - Y(x.v), atFloor = x.v <= 0.03;
+    s += `<g data-id="${x.p.id}" class="thrb" tabindex="0" role="button" aria-label="${esc(x.p.n)}: ${x.p.s} escaños, barrera efectiva ${fmt(x.v)}"><title>${esc(x.p.n)} · ${x.p.s} escaños · barrera efectiva ${fmt(x.v)}${atFloor ? ' (manda el 3 % legal)' : ''}</title>
+      <rect x="${cx - bw * .36}" y="${Y(x.v)}" width="${bw * .72}" height="${h}" rx="2" fill="${atFloor ? 'var(--faint)' : 'var(--focus)'}" fill-opacity=".72"/>
+      <rect x="${cx - bw / 2}" y="${m.t - 16}" width="${bw}" height="${H - m.t - m.b + 16 + 90}" fill="transparent"/>
+      <text x="${cx}" y="${m.t - 20}" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--ink)">${x.p.s}</text><text x="${cx}" y="${Y(x.v) - 5}" text-anchor="middle" font-size="10" fill="var(--ink)" stroke="var(--surface)" stroke-width="3" paint-order="stroke" pointer-events="none">${nf(x.v * 100, 1)}</text>
+      <text transform="translate(${cx + 4},${H - m.b + 10}) rotate(-60)" text-anchor="end" font-size="11" fill="var(--muted)">${esc(nm(x.p))}</text></g>`;
+  });
+  s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(0.03)}" y2="${Y(0.03)}" stroke="var(--ink)" stroke-width="1.4" stroke-dasharray="2 4" stroke-linecap="round" pointer-events="none"/><text x="${W - m.r}" y="${Y(0.03) - 5}" text-anchor="end" font-size="10.5" fill="var(--ink)" pointer-events="none">Umbral legal 3 %</text><text x="${m.l - 7}" y="${m.t - 22}" text-anchor="end" font-size="10.5" fill="var(--muted)">Escaños</text>`;
+  svg.innerHTML = s;
+  svg.querySelectorAll('.thrb').forEach(g => { const go = () => { nav(hProv(g.dataset.id)) }; g.onclick = go; g.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go() } } });
+}
+(async () => {
+  try {
+    await loadG(); MAP = await jget('mapas/provincias.json');
+    partic(); votes(); seatsView(); groups(); tiles(); detail(); lastSeats(); thrChart();
+    await mountBar('');
+    $('#bMun').href = hMun(DEF_MUN);
+    $('#notes').innerHTML = '<div><b>Fuente.</b> Ministerio del Interior: resultados del Congreso por mesa. Cada mesa se agrega por sección censal, municipio y provincia; el voto CERA (residentes en el extranjero) cuenta solo a escala provincial.</div>';
+  } catch (e) { $('#notes').textContent = 'No se pudieron cargar los datos: ' + e }
+})();
+</script>
+</body>
+</html>

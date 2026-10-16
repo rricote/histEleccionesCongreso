@@ -1,0 +1,1 @@
+(window.__J=window.__J||{})["datos/elecciones.json"]=[{"id": "2023-07", "label": "Elecciones al Congreso 2023", "kind": "Congreso"}];

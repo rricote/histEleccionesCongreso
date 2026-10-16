@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Resultados finales de una provincia en las elecciones generales: voto, escaños, reparto D'Hondt, último escaño y municipios.">
+<title>Resultados por provincia</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="sitetitle"><a href="index.html">Elecciones al Congreso de los Diputados</a></div>
+  <div class="topbar">
+    <nav class="crumbs" id="crumbs" aria-label="Migas de pan"></nav>
+  </div>
+  <div id="bar"></div>
+<nav class="tabs" role="tablist" aria-label="Secciones"><button type="button" role="tab" id="tab-prov" aria-controls="p-prov" aria-selected="true">Provincia</button><button type="button" role="tab" id="tab-muns" aria-controls="p-muns" aria-selected="false" tabindex="-1">Análisis detallado de los municipios o de las secciones censales</button></nav>
+  <div class="panel" id="p-prov" role="tabpanel" aria-labelledby="tab-prov">
+  <div class="mapwrap provwrap">
+    <section class="card mapcol">
+      <h2 id="mapt">Mapa</h2>
+      <div class="seg2" role="group" aria-label="Tipo de mapa"><button type="button" id="vMun" aria-pressed="true">Municipios</button><button type="button" id="vProv" aria-pressed="false">Provincia</button></div>
+      <p class="note" id="mapn"></p>
+      <svg class="pmap munmap" id="pmap" role="img" aria-label="Mapa de la provincia"></svg>
+      <div class="leg2" id="mleg"></div>
+      <div class="seatstrip" id="seatstrip" aria-label="Escaños de la provincia por partido"></div>
+      <p class="mapnote" id="mapnote"></p>
+    </section>
+    <section class="card pd" id="pd"></section>
+  </div>
+
+  <section class="card" id="dhc"></section>
+
+  <section class="card">
+    <h2>El último escaño</h2>
+    <p class="note" id="lsn"></p>
+    <div class="ls" id="ls"></div>
+  </section>
+
+  </div>
+  <div class="panel" id="p-muns" role="tabpanel" aria-labelledby="tab-muns" hidden>
+  <section class="card" id="pbcard"></section>
+  <div class="cols one">
+    <section class="card">
+      <h2>Municipios de la provincia</h2>
+      <p class="note">Pulsa una fila para ver el municipio, con el resultado por secciones censales. Ordena con las cabeceras.</p>
+      <label class="fld sel" style="max-width:260px"><span class="lbl">Filtrar por nombre</span><input id="mfilt" class="in" style="border:1px solid var(--rule);padding:7px 9px" placeholder="Escribe…"></label>
+      <div class="tw tall"><table class="pt mt mun" id="mtab"></table></div>
+    </section>
+  </div>
+
+  </div>
+  <div class="notes" id="notes"></div>
+</div>
+<div class="tt" id="tt"></div>
+<script src="js/lib.js"></script>
+<script>
+let P, PJ, MAPM, A, M = [], MODE = 'mun', ALL = false, SORT = { k: 'censo', d: -1 }, FILT = '';
+const PID = (() => { let p = Q.get('p') || DEF_PROV; return /^\d\d$/.test(p) ? p : DEF_PROV })();
+if (AUTONOMAS[PID]) nav(hMun(AUTONOMAS[PID]));
+const toG = loc => { const g = new Array(NP).fill(0); loc.forEach((v, j) => g[PJ.parties[j]] = v); return g };
+function build() {
+  M = PJ.m.map(m => { const v = toG(m[5]), w = winOf(v, m[3]), vt = v.reduce((a, b) => a + b, 0) + m[3] + m[4]; return { id: PID + m[0], c3: m[0], n: m[1], censo: m[2], bl: m[3], nu: m[4], v, w, part: m[2] ? vt / m[2] : 0, secs: m[6].length } });
+}
+function head() {}
+function map() {
+  const svg = $('#pmap'), MS = MAPM.ms, pw = winOf(P.v, P.bl), byId = {}; M.forEach(m => byId[m.c3] = m);
+  svg.setAttribute('viewBox', `0 0 ${MAPM.w} ${MAPM.h}`); svg.classList.toggle('munmap', MODE === 'mun'); svg.classList.toggle('nob', MODE === 'prov');
+  $('#vMun').setAttribute('aria-pressed', MODE === 'mun'); $('#vProv').setAttribute('aria-pressed', MODE === 'prov');
+  $('#mapt').textContent = MODE === 'mun' ? 'Mapa por municipios' : 'Mapa de la provincia';
+  $('#mapn').textContent = MODE === 'mun' ? 'Color: partido más votado en cada municipio; cuanto más pálido, menor la ventaja sobre el segundo. Pasa el ratón por un municipio para ver su voto abajo; pulsa para fijarlo.' : 'Color: partido con más escaños en la provincia; el tono refleja su ventaja en votos sobre el segundo.';
+  const used = new Set();
+  svg.innerHTML = '<g' + (MODE === 'prov' ? ` style="opacity:${(() => { const o = /fill-opacity:([\\d.]+)/.exec(shade(A.order.filter(i => A.es[i] > 0).sort((x, y) => A.es[y] - A.es[x] || P.v[y] - P.v[x])[0], pw.m, 0.22)); return o ? o[1] : 1 })()}"` : '') + '>' + MS.map(([c3, name, d]) => { const m = byId[c3]; if (!m || !m.w) return `<path class="nd" d="${d}"><title>${esc(name)} · sin datos</title></path>`;
+    if (MODE === 'prov') { const b = A.order.filter(i => A.es[i] > 0).sort((x, y) => A.es[y] - A.es[x] || P.v[y] - P.v[x])[0]; used.add(b); const op = /fill-opacity:([\d.]+)/.exec(shade(b, pw.m, 0.22)); return `<path d="${d}" style="fill:${pcol(b)};stroke:${pcol(b)};stroke-width:1px;--o:${op ? op[1] : 1}" data-m="${m.id}"><title>${esc(P.n)}</title></path>` }
+    used.add(m.w.w); return `<path d="${d}" style="${shade(m.w.w, m.w.m)}" data-m="${m.id}" tabindex="0" role="link" aria-label="${esc(name)}"><title>${esc(name)} · ${esc(G.parties[m.w.w].n)} ${fmt(m.w.sh)} · ventaja ${fmt(m.w.m)}</title></path>` }).join('') + '</g>';
+  hoverFront(svg);
+  const oldp = document.getElementById('upanel'); if (oldp) oldp.remove();
+  if (MODE === 'mun') attachPanel(svg, 'path[data-m]', 'm', id => { const m = M.find(x => x.id === id); if (!m) return null;
+    return { title: m.n, meta: `${nf(m.censo)} electores · ${nf(m.secs)} ${m.secs === 1 ? 'sección censal' : 'secciones censales'}`, v: m.v, bl: m.bl, nu: m.nu, censo: m.censo, ref: { v: P.v, bl: P.bl }, refName: 'la provincia',
+      action: { label: 'Ver detallado por sección censal →', run: () => nav(hMun(m.id)) } } }, 'Pasa el ratón por un municipio para ver su voto al detalle. Pulsa para fijarlo y poder ir a su vista por secciones censales.');
+  $('#mleg').innerHTML = [...used].map(i => `<span><i style="background:${pcol(i)}"></i>${esc(G.parties[i].n)}</span>`).join('') + (MODE === 'mun' ? '<span>Más pálido = ventaja más corta</span>' : '');
+  const key = k => { const j = SEQ.indexOf(k); return j < 0 ? SEQ.indexOf('PP') - 0.5 : j };
+  const list = []; A.order.filter(i => A.es[i] > 0).sort((a, b) => key(G.parties[a].k) - key(G.parties[b].k)).forEach(i => { for (let n = 0; n < A.es[i]; n++) list.push(i) });
+  $('#seatstrip').innerHTML = list.map(i => `<i style="background:${pcol(i)}" title="${esc(G.parties[i].n)}"></i>`).join('');
+  const cnt = {}; M.forEach(m => { if (m.w) cnt[m.w.w] = (cnt[m.w.w] || 0) + 1 });
+  $('#mapnote').innerHTML = 'Municipios ganados: ' + Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 5).map(i => `<b style="color:${pcol(i)}">${esc(G.parties[i].n)} ${nf(cnt[i])}</b>`).join(' · ');
+}
+const rv = (x, to) => Math.round(x / to) * to;
+function detail() {
+  const seats = P.s, row = A.row, valid = A.valid, thr = Math.max(0.03, 1 / (seats + 1)), eff = effThreshold(row, seats);
+  const lastW = A.lastW, firstO = A.firstO, qmax = A.q[0].q, qshow = seats > 12 ? A.q.filter(x => x.n > seats - 10) : A.q;
+  let ks = A.order.filter(i => A.es[i] > 0 || row[i] >= 0.01); if (ALL) ks = A.order;
+  const cc = G.ccaa.find(c => c.id === P.cc);
+  const vot = d => { const v = Math.abs(d) * valid; return nf(v >= 10000 ? rv(v, 100) : rv(v, 10)) };
+  const rowsH = ks.map(i => {
+    const n1 = needShare(row, i, seats, 1), c = A.es[i], nx = c + 1 <= seats ? needShare(row, i, seats, c + 1) : null;
+    const d1 = n1 === null ? null : row[i] - n1, dn = nx === null ? null : nx - row[i];
+    const c1 = n1 === null ? '–' : `${fmt(n1)} <small class="${d1 >= 0 ? 'gd' : 'bd'}">${pts(d1) || '0,0'}</small><span class="v2">${d1 >= 0 ? `sobran ≈ ${vot(d1)} votos` : `faltan ≈ ${vot(d1)} votos`}</span>`;
+    const c2 = nx === null ? '–' : `${fmt(nx)} <small class="bd">+${nf(dn * 100, 1)}</small><span class="v2">faltan ≈ ${vot(dn)} votos</span>`;
+    return `<tr><td><span class="wn">${swatch(i)}${esc(G.parties[i].n)}</span></td><td class="num">${nf(P.v[i])}</td><td class="num"><b>${fmt(row[i])}</b></td><td class="num s2">${c}</td><td class="num need" title="Voto que habría necesitado para el primer escaño, con el resto de partidos reducidos en proporción">${c1}</td><td class="num need" title="Voto que habría necesitado para un escaño más">${c2}</td></tr>`;
+  }).join('');
+  $('#pd').innerHTML = `<h3>${esc(P.n)}</h3><div class="meta">${seats} ${seats === 1 ? 'escaño' : 'escaños'} · ${esc(cc ? cc.n : '')} · ${nf((valid - P.bl) / 1e6, 2)} M de votos a candidaturas (${nf(valid)} válidos)</div>
+  <div class="kpis k4"><div><b>${fmt(thr, 1)}</b><span>voto aproximado para sacar un escaño (el 3 % legal o 1/(escaños+1), el mayor)</span></div>
+  <div><b>${eff === null ? '–' : fmt(eff)}</b><span>barrera efectiva: voto que habría necesitado un partido nuevo, sin contar el 3 %</span></div>
+  <div><b>${lastW ? esc(G.parties[lastW.k].n) : '–'}</b><span>se lleva el último escaño${lastW ? ` con ${fmt(lastW.q)} (${nf(Math.round(lastW.q * valid))} votos entre ${lastW.d})` : ''}</span></div>
+  <div><b>${firstO ? esc(G.parties[firstO.k].n) : '–'}</b><span>primero fuera${firstO ? `, con ${fmt(firstO.q)} (${nf(Math.round(firstO.q * valid))} votos entre ${firstO.d})` : ''}</span></div></div>
+  <div class="tw"><table class="pt mt prt vt"><thead><tr><th>Partido</th><th>Votos</th><th>% voto</th><th>Escaños</th><th>Para el 1.º</th><th>Para otro más</th></tr></thead><tbody>${rowsH}</tbody></table></div>
+  <p style="margin:10px 0 0"><button type="button" class="ghost" id="allp">${ALL ? 'Mostrar solo los principales' : 'Mostrar todas las candidaturas'}</button></p>
+  <p class="note" style="margin:10px 0 0">«Para el 1.º» y «Para otro más» son el voto provincial que el partido habría necesitado para ese escaño, con el resto de partidos reducidos en proporción (verde si ya lo superaba, rojo si le faltaba). La cifra pequeña es la distancia en puntos y debajo, los votos que habrían tenido que cambiar de papeleta, aproximados con el reparto proporcional de los votos del resto.</p>
+`;
+  $('#dhc').innerHTML = `<h2>Cómo se reparten los escaños</h2>
+  <p class="note">Método D'Hondt: cada partido por encima del 3 % de los votos válidos divide su voto entre 1, 2, 3…; los ${seats} cocientes más altos se llevan un escaño. Las barras sólidas ganan escaño; las de trazo punteado son los primeros que se quedan fuera.${seats > 12 ? ' Aquí se muestran solo los últimos diez escaños repartidos y los que se quedan a las puertas.' : ''}</p>
+  <div class="qs">${qshow.map(x => `<div class="qr ${x.won ? 'won' : 'out'}"><span class="qn">${x.n}</span><span class="qp">${swatch(x.k)}${esc(G.parties[x.k].n)} <small>÷${x.d}</small></span><span class="qb"><i style="width:${x.q / qmax * 100}%;background:${pcol(x.k)}"></i></span><span class="qv">${fmt(x.q)}<small>${nf(Math.round(x.q * valid))}</small></span></div>`).join('')}</div>`;
+  $('#allp').onclick = () => { ALL = !ALL; detail() };
+}
+function lastSeat() {
+  const seats = P.s, row = A.row, valid = A.valid, MAXG = 4, fm = x => x.toFixed(2).replace('.', ',');
+  if (!A.lastW || seats < 2) { $('#lsn').textContent = ''; $('#ls').innerHTML = '<p class="note">Con un solo escaño en juego no hay un «último escaño» que repartir entre varios partidos: se lo lleva el más votado.</p>'; return }
+  const h = A.lastW.k, gaps = [];
+  A.order.filter(i => i !== h).slice(0, 12).forEach(i => { const nd = needShare(row, i, seats, A.es[i] + 1); if (nd !== null) gaps.push([i, (nd - row[i]) * 100, (nd - row[i]) * valid]) });
+  gaps.sort((a, b) => a[1] - b[1]);
+  $('#lsn').textContent = `${G.parties[h].n} se llevó el último de los ${seats} escaños. Cada cuadrado es un rival y su posición marca cuántos puntos de voto le habrían faltado para quitárselo (con el resto de partidos reducidos en proporción). Se muestran los que estaban a menos de ${MAXG} puntos.`;
+  const near = gaps.filter(g => g[1] <= MAXG).slice(0, 4), x = g => (1 - Math.min(g, MAXG) / MAXG) * 100;
+  const ticks = [4, 3, 2, 1, 0].map(v => `<span class="${v % 2 ? 'o' : ''}" style="left:${(1 - v / MAXG) * 100}%">${v === 0 ? 'empate' : 'a ' + v + ' pts'}</span>`).join('');
+  let s = `<div class="ax"><span>Provincia</span><div class="tk">${ticks}</div><span class="hh">Tiene el último escaño</span></div>`;
+  if (!near.length) s += `<p class="note" style="margin:12px 0 0">Ningún rival estaba a menos de ${MAXG} puntos: el último escaño estaba bastante asegurado. El rival más cercano era ${gaps.length ? `${esc(G.parties[gaps[0][0]].n)}, a ${fm(gaps[0][1])} puntos (unos ${nf(Math.ceil(gaps[0][2] / 100) * 100)} votos)` : '—'}.</p>`;
+  else {
+    const g0 = near[0], pos = x(g0[1]), al = pos > 70 ? `right:${100 - pos}%;text-align:right` : `left:${pos}%;transform:translateX(-50%)`;
+    s += `<div class="row static"><span class="nm"><b>${esc(P.n)}</b><small>${seats} escaños</small></span><span class="tr">${[1, 2, 3].map(v => `<span class="g" style="left:${x(v)}%"></span>`).join('')}${near.slice().reverse().map(g => `<span class="sq" style="left:${x(g[1])}%;background:${pcol(g[0])}" title="${esc(G.parties[g[0]].n)} a ${fm(g[1])} pts."></span>`).join('')}<span class="lb" style="color:${pcol(g0[0])};${al}">${esc(G.parties[g0[0]].n.toUpperCase())} a ${fm(g0[1])} pts.</span></span><span class="hd" style="color:${pcol(h)}">${esc(G.parties[h].n)}</span></div>`;
+    s += `<p class="note" style="margin:12px 0 0">${near.map(g => `${esc(G.parties[g[0]].n)}: ${fm(g[1])} pts · unos ${nf(Math.ceil(g[2] / 10) * 10)} votos`).join(' · ')}</p>`;
+  }
+  $('#ls').innerHTML = s;
+}
+let PBS, PBM = 'mun';
+function pblock() {
+  const ps = G.parties.map((x, i) => i).filter(i => M.some(m => m.v[i] > 0)).sort((a, b) => P.v[b] - P.v[a]);
+  PBS = PBS || { party: ps[0], ord: 'pct_desc' };
+  let units;
+  if (PBM === 'mun') units = M.map(m => ({ key: m.id, name: m.n, censo: m.censo, part: m.part, v: m.v, bl: m.bl, nu: m.nu }));
+  else { units = []; PJ.m.forEach(mm => mm[6].forEach(s => { const v = toG(s.slice(4)), valid = v.reduce((a, b) => a + b, 0) + s[2];
+    units.push({ key: PID + mm[0], name: `${mm[1]} · Dist. ${s[0].slice(0, 2)} Sec. ${s[0].slice(2)}`, censo: s[1], part: s[1] ? (valid + s[3]) / s[1] : 0, v, bl: s[2], nu: s[3] }) })) }
+  const mun = PBM === 'mun';
+  partyBlock($('#pbcard'), { state: PBS, ps, units, parent: { v: P.v, bl: P.bl }, parentName: 'de la provincia',
+    modes: [{ id: 'mun', label: 'Por municipio' }, { id: 'sec', label: 'Por sección censal' }], mode: PBM, onMode: x => { PBM = x; pblock() },
+    unitName: mun ? 'Municipio' : 'Sección censal', unitsPl: mun ? 'municipios' : 'secciones censales',
+    note: `El número junto al nombre es su escaños en la provincia. Elige un partido, el nivel (municipios o secciones censales) y cómo ordenar: la tabla muestra los diez primeros.`.replace('su escaños', 'su número de escaños'),
+    chipSub: j => nf(A.es[j]) + ' esc.', onRow: id => nav(hMun(id)) });
+}
+function mtable() {
+  const ps = G.parties.map((x, i) => i).filter(i => M.some(m => m.v[i] > 0)).sort((a, b) => P.v[b] - P.v[a]);
+  const val = m => m.v.reduce((a, b) => a + b, 0) + m.bl;
+  const rows = M.filter(m => m.n.toLowerCase().includes(FILT.toLowerCase())).map(m => { const o = { m, censo: m.censo, part: m.part, ganador: m.w ? G.parties[m.w.w].n : '', sh: m.w ? m.w.sh : 0, margen: m.w ? m.w.m : 0, name: m.n, valid: val(m), bl: m.bl, nu: m.nu };
+    o.pbl = o.valid ? m.bl / o.valid : 0; ps.forEach(i => o['p' + i] = o.valid ? m.v[i] / o.valid : 0); return o });
+  const k = SORT.k; rows.sort((a, b) => (typeof a[k] === 'string' ? a[k].localeCompare(b[k], 'es') : a[k] - b[k]) * SORT.d);
+  const th = (key, lab, cls = '') => `<th data-s="${key}" ${SORT.k === key ? `aria-sort="${SORT.d > 0 ? 'ascending' : 'descending'}"` : ''} class="${cls}">${lab}</th>`;
+  const cell = (sh, v) => `<td class="num pc">${fmt(sh)}<small>${nf(v)}</small></td>`;
+  $('#mtab').innerHTML = `<thead><tr>${th('name', 'Municipio', 'stk')}${th('censo', 'Electores')}${th('part', 'Particip.')}${th('ganador', 'Más votado')}${th('sh', '% ganador')}${th('margen', 'Ventaja')}${ps.map(i => th('p' + i, `<span class="wn">${swatch(i)}${esc(G.parties[i].n)}</span>`)).join('')}${th('pbl', 'En blanco')}${th('nu', 'Nulos')}</tr></thead><tbody>${rows.map(r => `<tr class="rw" data-m="${r.m.id}"><td class="stk">${esc(r.m.n)}</td><td class="num">${nf(r.m.censo)}</td><td class="num">${fmt(r.m.part)}</td><td>${r.m.w ? `<span class="wn">${swatch(r.m.w.w)}${esc(r.ganador)}</span>` : '–'}</td><td class="num">${r.m.w ? fmt(r.sh) : '–'}</td><td class="num">${r.m.w ? nf(r.margen * 100, 1) + ' pts' : '–'}</td>${ps.map(i => cell(r['p' + i], r.m.v[i])).join('')}${cell(r.pbl, r.bl)}<td class="num">${nf(r.nu)}</td></tr>`).join('')}</tbody>`;
+  $('#mtab').querySelectorAll('th[data-s]').forEach(t => t.onclick = () => { const kk = t.dataset.s; SORT = { k: kk, d: SORT.k === kk ? -SORT.d : (kk === 'name' || kk === 'ganador' ? 1 : -1) }; mtable() });
+  $('#mtab').querySelectorAll('tr.rw').forEach(t => t.onclick = () => { nav(hMun(t.dataset.m)) });
+}
+(async () => {
+  try {
+    await loadG(); P = G.prov[G.pi[PID]]; A = analyze(P);
+    [PJ, MAPM] = await Promise.all([jget(BASE + 'prov_' + PID + '.json'), jget('mapas/mun_' + PID + '.json')]);
+    build(); setPill(); document.title = P.n + ' · resultados por provincia';
+    crumbs([{ t: 'General', h: href('index.html') }, { l: 'Provincia', t: P.n }]);
+    await mountBar(PID); mountTabs();
+    map(); detail(); lastSeat(); mtable(); pblock();
+    $('#vMun').onclick = () => { MODE = 'mun'; map() }; $('#vProv').onclick = () => { MODE = 'prov'; map() };
+    $('#mfilt').oninput = e => { FILT = e.target.value; mtable() };
+    $('#notes').innerHTML = '<div><b>Fuente.</b> Ministerio del Interior: resultados del Congreso por mesa. Cada mesa se agrega por sección censal, municipio y provincia; el voto CERA (residentes en el extranjero) cuenta solo a escala provincial.</div>';
+  } catch (e) { console.error(e) }
+})();
+</script>
+</body>
+</html>

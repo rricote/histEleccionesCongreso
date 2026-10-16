@@ -1,0 +1,7 @@
+Resultados generales (2023-07): fuentes del proceso
+1. parse.py <carpeta con 02202307_MESA descomprimido> 2307  -> lee ficheros 03 y 09/10 del Interior (por mesa).
+2. build_data.py -> agrega mesa -> seccion -> municipio -> provincia (+CERA), reparte escaños D'Hondt (3 %), comprueba contra 05, 06, 07 y 08 oficiales y escribe datos/<eleccion>/general.json y prov_XX.json.
+3. mk_sec.py -> convierte el seccionado del INE (shapefile ETRS89 UTM30) a mapas/sec_XX.json (SVG simplificado por provincia). Clave: CUSEC = provincia+municipio+distrito+seccion.
+mun_shapes.json y mapa_provincias.json: contornos municipales y de provincias (IGN via es-atlas).
+Para otra eleccion: nuevo directorio datos/<aaaa-mm>/ y anadirla a datos/elecciones.json; las paginas leen ?e=<aaaa-mm>.
+Rutas de los scripts apuntan al espacio de trabajo de la sesion; hay que ajustarlas.
