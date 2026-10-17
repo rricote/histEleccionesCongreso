@@ -265,3 +265,20 @@ function partyBlock(host, o) {
   };
   draw();
 }
+
+/* ---- tooltip inmediato en los mapas (sustituye al <title> nativo, que tarda en salir) ---- */
+(() => {
+  let tt = null, cur = null;
+  const box = () => tt || (tt = document.getElementById('tt'));
+  const pos = e => { const t = box(); if (!t) return; const w = t.offsetWidth, h = t.offsetHeight; let x = e.clientX + 14, y = e.clientY + 16; if (x + w > innerWidth - 8) x = e.clientX - w - 14; if (y + h > innerHeight - 8) y = e.clientY - h - 14; t.style.left = Math.max(4, x) + 'px'; t.style.top = Math.max(4, y) + 'px' };
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest && e.target.closest('svg#pmap path, svg#pmap rect, svg.mapsvg path, svg.mapsvg rect');
+    if (!el || !box()) return;
+    const ti = el.querySelector(':scope > title');
+    if (ti) { el.dataset.tt = ti.textContent; ti.remove() }
+    if (!el.dataset.tt) return;
+    cur = el; const t = box(); t.style.maxWidth = '340px'; t.textContent = el.dataset.tt; t.style.display = 'block'; pos(e);
+  });
+  document.addEventListener('mousemove', e => { if (cur) pos(e) });
+  document.addEventListener('mouseout', e => { if (cur && !(e.relatedTarget && cur.contains(e.relatedTarget)) && e.target.closest && e.target.closest('svg') && (!e.relatedTarget || e.relatedTarget === document.documentElement || !e.relatedTarget.closest || e.relatedTarget.closest('svg#pmap path, svg#pmap rect, svg.mapsvg path, svg.mapsvg rect') !== cur)) { const t = box(); if (t) t.style.display = 'none'; cur = null } });
+})();

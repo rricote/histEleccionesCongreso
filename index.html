@@ -23,11 +23,6 @@
 
   <div class="cols vt">
     <section class="card">
-      <h2>Voto</h2>
-      <p class="note">% sobre votos válidos (incluye el voto en blanco), CERA incluido.</p>
-      <div class="rows" id="votes"></div>
-    </section>
-    <section class="card">
       <h2>Escaños</h2>
       <p class="note">Reparto D'Hondt por provincia con umbral del 3 % en cada circunscripción. Mayoría absoluta: 176.</p>
       <div class="seg2" role="group" aria-label="Vista de escaños"><button type="button" id="bParl" aria-pressed="true">Escaños en el parlamento</button><button type="button" id="bTerr" aria-pressed="false">Distribución territorial de escaños</button></div>
@@ -36,6 +31,11 @@
       <table class="tbl" id="tbl"><thead><tr><th>Partido</th><th>Escaños</th><th>Votos</th><th>% voto</th></tr></thead><tbody></tbody></table>
       </div>
       <div id="vTerr" hidden><p class="zoomrow"><button type="button" class="zoombtn" id="bZoom">⤢ Ampliar mapa</button></p><div class="emap"><svg id="emap" viewBox="0 0 536 337" role="img" aria-label="Mapa de la distribución territorial de escaños"></svg></div><div class="leg" id="eleg"></div><p class="note">Cada provincia se colorea con el partido más votado; cuanto más oscuro el tono, mayor su porcentaje de voto. Cada círculo es un escaño. Pulsa una provincia para ver su detalle.</p></div>
+    </section>
+    <section class="card">
+      <h2>Voto</h2>
+      <p class="note">% sobre votos válidos (incluye el voto en blanco), CERA incluido.</p>
+      <div class="rows" id="votes"></div>
     </section>
   </div>
 
@@ -48,7 +48,7 @@
   <div class="mapwrap bigmap">
     <section class="card">
       <h2>Quién lidera cada provincia</h2>
-      <p class="note">Color: partido con más escaños; cuanto más pálido, menor la ventaja en votos sobre el segundo. Ceuta y Melilla (cuadrados) abren directamente la vista de municipio; Canarias va en su recuadro. Pasa el ratón para ver un resumen y pulsa para entrar.</p>
+      <p class="note">Color: partido con más escaños; cuanto más pálido, menor la ventaja en votos sobre el segundo. Ceuta y Melilla se muestran como cuadrados y Canarias en su recuadro. Pulsa una provincia para ver su resumen debajo; el botón del resumen abre su vista.</p>
       <div id="tiles"></div><div class="leg" id="mleg"></div>
     </section>
     <section class="card pd" id="pd"></section>
@@ -163,13 +163,13 @@ function terrView() {
   $('#eleg').innerHTML = used.map(i => `<span><i style="background:${mcol(i)}"></i>${esc(G.parties[i].n)} ${es[i]}</span>`).join('');
 }
 function terrToggle(on) {
-  $('#vParl').hidden = on;  $('#vTerr').hidden = !on; $('#bParl').setAttribute('aria-pressed', !on); $('#bTerr').setAttribute('aria-pressed', on);
+  $('#vParl').hidden = on; document.querySelector('.cols').classList.toggle('one', on);  $('#vTerr').hidden = !on; $('#bParl').setAttribute('aria-pressed', !on); $('#bTerr').setAttribute('aria-pressed', on);
   if (on && !EM) jget('mapas/escanos.json').then(t => { EM = t; terrView() }).catch(() => { $('#eleg').textContent = 'No se pudo cargar el mapa.' });
 }
 function an(id) { return AN[id] || (AN[id] = analyze(G.prov[G.pi[id]])) }
 function winSeats(id) { const p = G.prov[G.pi[id]], a = an(id); let b = -1; for (const i of a.order) if (b < 0 || a.es[i] > a.es[b] || (a.es[i] === a.es[b] && p.v[i] > p.v[b])) b = i; return b }
 function tiles() {
-  drawProvMap('#tiles', MAP, { sel, pick: id => { nav(hProv(id)) }, hover: id => { if (sel !== id) { sel = id; tiles(); detail() } },
+  drawProvMap('#tiles', MAP, { sel, pick: id => { if (sel !== id) { sel = id; tiles(); detail() } },
     style: id => { const p = G.prov[G.pi[id]], w = winOf(p.v, p.bl); const b = winSeats(id); return shade(b, w ? w.m : 0, 0.22) },
     title: id => { const p = G.prov[G.pi[id]], b = winSeats(id); return `${p.n} · ${G.parties[b].n} (${an(id).es[b]} de ${p.s})` } });
   const used = new Set(G.prov.map(p => winSeats(p.id)));

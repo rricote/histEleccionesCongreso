@@ -410,7 +410,7 @@ small.gd,td.gd{color:var(--good)}small.bd,td.bd{color:var(--bad)}
 .emap .elin line{stroke:#000;stroke-width:.55;stroke-linecap:round}
 .emap .east{fill:#fff;font:700 23.56px Arial,Helvetica,sans-serif;text-anchor:middle;pointer-events:none}
 .emap .evot{fill:#555;font:700 5.6px Arial,Helvetica,sans-serif}
-@media(min-width:861px){.cols.vt{grid-template-columns:minmax(0,3fr) minmax(0,7fr)}}
+@media(min-width:861px){.cols.vt{grid-template-columns:minmax(0,7fr) minmax(0,3fr)}.cols.vt.one{grid-template-columns:minmax(0,1fr)}}
 
 .zoomrow{margin:0 0 6px}.zoombtn{font:500 13px var(--f-body);border:1px solid var(--rule);background:var(--surface);color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer}.zoombtn:hover{border-color:var(--ink)}
 .mbox{position:fixed;inset:0;z-index:50;background:#fff;display:flex;flex-direction:column}.mbox[hidden]{display:none}
