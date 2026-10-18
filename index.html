@@ -100,7 +100,9 @@ function seatsView() {
 }
 function groups() {
   const es = G.nat.es, tot = es.reduce((a, b) => a + b, 0), VW = 700, X0 = 2, SC = (VW - 4) / tot, xs = n => X0 + n * SC;
-  $('#groups').innerHTML = groupsDef().map(g => {
+  const gs = groupsDef().map(g => ({ ...g, R: ['PP', 'UCD'].includes(G.parties[g.idx[0]]?.k), t: g.idx.reduce((a, i) => a + es[i], 0) }));
+  const ordG = [...gs.filter(g => g.R).sort((a, b) => a.t - b.t || a.idx.length - b.idx.length), ...gs.filter(g => !g.R).sort((a, b) => b.t - a.t || b.idx.length - a.idx.length)];
+  $('#groups').innerHTML = ordG.map(g => {
     const segs = g.idx.filter(i => es[i] > 0).map(i => ({ i, n: es[i] })).sort((a, b) => b.n - a.n), t = segs.reduce((a, s) => a + s.n, 0);
     let x = 0, rects = '', labels = ''; const rowEnd = [-1e9, -1e9];
     segs.forEach(sg => { const w = sg.n * SC, x1 = xs(x); rects += `<rect x="${x1.toFixed(1)}" y="40" width="${Math.max(w, 0.8).toFixed(1)}" height="26" fill="${pcol(sg.i)}" stroke="var(--surface)" stroke-width="1"><title>${esc(G.parties[sg.i].n)}: ${sg.n}</title></rect>`;
