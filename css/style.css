@@ -423,3 +423,7 @@ small.gd,td.gd{color:var(--good)}small.bd,td.bd{color:var(--bad)}
 .mbody .elin line{stroke:#000;stroke-width:.55;stroke-linecap:round}
 .mbody .east{fill:#fff;font:700 23.56px Arial,Helvetica,sans-serif;text-anchor:middle;pointer-events:none}
 .mbody .evot{fill:#555;font:700 5.6px Arial,Helvetica,sans-serif}
+
+.zbtn{position:absolute;top:8px;right:8px;z-index:5;font:inherit;font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.zbtn:hover{background:var(--bg)}
+svg.natmap.panning,svg.pmap.panning{cursor:grabbing}
