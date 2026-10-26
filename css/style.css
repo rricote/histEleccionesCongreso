@@ -387,13 +387,13 @@ small.gd,td.gd{color:var(--good)}small.bd,td.bd{color:var(--bad)}
 .tabs button:focus-visible{outline:3px solid var(--focus);outline-offset:-3px;border-radius:4px}
 .panel[hidden]{display:none!important}
 /* tablas de análisis con una columna por partido */
-#mtab,#stab{min-width:0;width:max-content;min-width:100%}
-#mtab th,#stab th{white-space:nowrap;cursor:pointer}
-#mtab td.pc,#stab td.pc{white-space:nowrap}
-#mtab td.pc small,#stab td.pc small{display:block;font:11px var(--f-mono);color:var(--faint)}
-#mtab th.stk,#mtab td.stk,#stab th.stk,#stab td.stk{position:sticky;left:0;background:var(--surface);z-index:2;white-space:nowrap;box-shadow:1px 0 0 var(--rule)}
-#mtab thead th.stk,#stab thead th.stk{z-index:3}
-#stab tr.hl td.stk,#mtab tr.rw:hover td.stk{background:var(--track)}
+#mtab,#stab,#rtab,#ptab{min-width:0;width:max-content;min-width:100%}
+#mtab th,#stab th,#rtab th,#ptab th{white-space:nowrap;cursor:pointer}
+#mtab td.pc,#stab td.pc,#rtab td.pc,#ptab td.pc{white-space:nowrap}
+#mtab td.pc small,#stab td.pc small,#rtab td.pc small,#ptab td.pc small{display:block;font:11px var(--f-mono);color:var(--faint)}
+#mtab th.stk,#mtab td.stk,#stab th.stk,#stab td.stk,#rtab th.stk,#rtab td.stk,#ptab th.stk,#ptab td.stk{position:sticky;left:0;background:var(--surface);z-index:2;white-space:nowrap;box-shadow:1px 0 0 var(--rule)}
+#mtab thead th.stk,#stab thead th.stk,#rtab thead th.stk,#ptab thead th.stk{z-index:3}
+#stab tr.hl td.stk,#mtab tr.rw:hover td.stk,#rtab tr.rw:hover td.stk,#ptab tr.rw:hover td.stk{background:var(--track)}
 .pbt{width:max-content;min-width:100%}
 .pbt th{white-space:nowrap}
 .pbt td.pc{white-space:nowrap}.pbt td.pc small{display:block;font:11px var(--f-mono);color:var(--faint)}

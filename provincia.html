@@ -15,7 +15,7 @@
     <nav class="crumbs" id="crumbs" aria-label="Migas de pan"></nav>
   </div>
   <div id="bar"></div>
-<nav class="tabs" role="tablist" aria-label="Secciones"><button type="button" role="tab" id="tab-prov" aria-controls="p-prov" aria-selected="true">Provincia</button><button type="button" role="tab" id="tab-muns" aria-controls="p-muns" aria-selected="false" tabindex="-1">Análisis detallado de los municipios o de las secciones censales</button></nav>
+<nav class="tabs" role="tablist" aria-label="Secciones"><button type="button" role="tab" id="tab-prov" aria-controls="p-prov" aria-selected="true">Provincia</button><button type="button" role="tab" id="tab-muns" aria-controls="p-muns" aria-selected="false" tabindex="-1">Análisis detallado de los municipios o de las secciones censales</button><button type="button" role="tab" id="tab-par" aria-controls="p-par" aria-selected="false" tabindex="-1">Partidos</button></nav>
   <div class="panel" id="p-prov" role="tabpanel" aria-labelledby="tab-prov">
   <div class="mapwrap provwrap">
     <section class="card mapcol">
@@ -51,12 +51,13 @@
   </div>
 
   </div>
+  <div class="panel" id="p-par" role="tabpanel" aria-labelledby="tab-par" hidden></div>
   <div class="notes" id="notes"></div>
 </div>
 <div class="tt" id="tt"></div>
-<script src="js/lib.js"></script>
+<script src="js/lib.js" charset="utf-8"></script>
 <script>
-let P, PJ, MAPM, A, M = [], MODE = 'mun', ALL = false, SORT = { k: 'censo', d: -1 }, FILT = '';
+let P, C, PJ, MAPM, A, M = [], MODE = 'mun', ALL = false, SORT = { k: 'censo', d: -1 }, FILT = '';
 const PID = (() => { let p = Q.get('p') || DEF_PROV; return /^\d\d$/.test(p) ? p : DEF_PROV })();
 if (AUTONOMAS[PID]) nav(hMun(AUTONOMAS[PID]));
 const toG = loc => { const g = new Array(NP).fill(0); loc.forEach((v, j) => g[PJ.parties[j]] = v); return g };
@@ -132,7 +133,7 @@ function lastSeat() {
   }
   $('#ls').innerHTML = s;
 }
-let PBS, PBM = 'mun';
+let PBS, PBM = 'mun', SECP = null;
 function pblock() {
   const ps = G.parties.map((x, i) => i).filter(i => M.some(m => m.v[i] > 0)).sort((a, b) => P.v[b] - P.v[a]);
   PBS = PBS || { party: ps[0], ord: 'pct_desc' };
@@ -159,15 +160,26 @@ function mtable() {
   $('#mtab').querySelectorAll('th[data-s]').forEach(t => t.onclick = () => { const kk = t.dataset.s; SORT = { k: kk, d: SORT.k === kk ? -SORT.d : (kk === 'name' || kk === 'ganador' ? 1 : -1) }; mtable() });
   $('#mtab').querySelectorAll('tr.rw').forEach(t => t.onclick = () => { nav(hMun(t.dataset.m)) });
 }
+function partidos() {
+  const ps = P.v.map((x, i) => i).filter(i => P.v[i] > 0).sort((a, b) => A.es[b] - A.es[a] || P.v[b] - P.v[a]).slice(0, 16), units = [];
+  PJ.m.forEach(mm => mm[6].forEach(x => units.push({ key: mm[0] + x[0], name: `${mm[1]} · Dist. ${x[0].slice(0, 2)} Sec. ${x[0].slice(2)}`, v: toG(x.slice(4)), bl: x[2], link: hMun(PID + mm[0]) })));
+  const lv = [{ id: 'mun', label: 'Municipios', one: 'Municipio', pl: 'municipios', labels: false, units: M.map(m => ({ key: m.c3, name: m.n, v: m.v, bl: m.bl, link: hMun(m.id) })),
+    draw: (h, st, tx, ti, pk) => ptSvg(h, MAPM.ms.map(x => [x[0], x[2]]), `0 0 ${MAPM.w} ${MAPM.h}`, st, null, ti, pk) }];
+  if (SECP) lv.push({ id: 'sec', label: 'Secciones censales', one: 'Sección', pl: 'secciones censales', labels: false, units, draw: (h, st, tx, ti, pk) => ptSvg(h, SECP.s, 'fit', st, null, ti, pk, true) });
+  partyTab($('#p-par'), { ps, parent: { name: P.n, short: 'provincia', v: P.v, bl: P.bl }, chipSub: j => nf(A.es[j]) + ' esc.',
+    seatKpi: i => `<div><b>${A.es[i] || 0}</b><span>escaños de ${P.s} en la provincia (${G.nat.es[i] || 0} en España)</span></div>`,
+    note: `El número junto al nombre es su número de escaños en la provincia. Elige un partido para ver su porcentaje de voto en cada municipio${G.sections ? ' o sección censal' : ''} de la provincia.`, levels: lv });
+}
 (async () => {
   try {
-    await loadG(); P = G.prov[G.pi[PID]]; A = analyze(P);
+    await loadG(); P = G.prov[G.pi[PID]]; C = G.cc[G.ci[P.cc]]; A = analyze(P);
     [PJ, MAPM] = await Promise.all([loadProv(PID), loadMunMap(PID)]);
     if (!G.sections) { $('#tab-muns').textContent = 'Análisis detallado de los municipios'; $('#mtt').textContent = 'Municipios de la provincia'; $('#mtn').textContent = 'Pulsa una fila para ver el municipio. Ordena con las cabeceras.' }
     build(); setPill(); document.title = P.n + ' · resultados por provincia';
-    crumbs([{ t: 'General', h: href('index.html') }, { l: 'Provincia', t: P.n }]);
+    crumbs(C.provs.length > 1 ? [{ t: 'España', h: href('index.html') }, { l: 'Comunidad', t: C.n, h: hCc(C.id) }, { l: 'Provincia', t: P.n }] : [{ t: 'España', h: href('index.html') }, { l: 'Comunidad', t: C.n }]);
     await mountBar(PID); mountTabs();
     map(); detail(); lastSeat(); mtable(); pblock();
+    SECP = await loadSecMap(PID); partidos();
     $('#vMun').onclick = () => { MODE = 'mun'; map() }; $('#vProv').onclick = () => { MODE = 'prov'; map() };
     $('#mfilt').oninput = e => { FILT = e.target.value; mtable() };
     $('#notes').innerHTML = notesHTML();

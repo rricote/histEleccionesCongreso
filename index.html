@@ -12,15 +12,17 @@
 <div class="wrap">
   <h1 class="sitetitle"><a href="index.html">Elecciones al Congreso de los Diputados</a></h1>
   <div class="topbar">
-    <nav class="crumbs" id="crumbs" aria-label="Migas de pan"><span class="cur">General</span></nav>
+    <nav class="crumbs" id="crumbs" aria-label="Migas de pan"><span class="cur">España</span></nav>
     <div class="navbtns">
-      <a class="btnlk" id="bProv" href="provincia.html">Vista por provincia →</a>
+      <a class="btnlk" id="bCc" href="ccaa.html">Vista por comunidad →</a>
+      <a class="btnlk ghost" id="bProv" href="provincia.html">Vista por provincia →</a>
       <a class="btnlk ghost" id="bMun" href="municipio.html">Vista por municipio →</a>
     </div>
   </div>
   <section class="card" id="part"><div class="kpis k4" id="partk"></div></section>
   <div id="bar"></div>
-
+<nav class="tabs" role="tablist" aria-label="Secciones"><button type="button" role="tab" id="tab-esp" aria-controls="p-esp" aria-selected="true">España</button><button type="button" role="tab" id="tab-det" aria-controls="p-det" aria-selected="false" tabindex="-1">Análisis detallado de las comunidades autónomas o de las provincias</button><button type="button" role="tab" id="tab-par" aria-controls="p-par" aria-selected="false" tabindex="-1">Partidos</button></nav>
+  <div class="panel" id="p-esp" role="tabpanel" aria-labelledby="tab-esp">
   <div class="cols vt">
     <section class="card">
       <h2>Escaños</h2>
@@ -47,8 +49,9 @@
 
   <div class="mapwrap bigmap">
     <section class="card">
-      <h2>Quién lidera cada provincia</h2>
-      <p class="note">Color: partido con más escaños; cuanto más pálido, menor la ventaja en votos sobre el segundo. Ceuta y Melilla se muestran como cuadrados y Canarias en su recuadro. Pulsa una provincia para ver su resumen debajo; el botón del resumen abre su vista.</p>
+      <h2 id="mapt">Quién lidera cada provincia</h2>
+      <div class="seg2" role="group" aria-label="Nivel del mapa"><button type="button" data-lv="esp" aria-pressed="false">España</button><button type="button" data-lv="cc" aria-pressed="false">Comunidades autónomas</button><button type="button" data-lv="prov" aria-pressed="true">Provincias</button></div>
+      <p class="note" id="mapn"></p>
       <div id="tiles"></div><div class="leg" id="mleg"></div>
     </section>
     <section class="card pd" id="pd"></section>
@@ -66,15 +69,28 @@
     <div class="tw"><svg id="thr" role="img" aria-label="Barrera electoral efectiva por provincia"></svg></div>
   </section>
 
+  </div>
+  <div class="panel" id="p-det" role="tabpanel" aria-labelledby="tab-det" hidden>
+  <section class="card" id="pbcard"></section>
+  <section class="card">
+    <h2 id="rtt">Resultados por comunidad autónoma</h2>
+    <div class="seg2" role="group" aria-label="Nivel de la tabla"><button type="button" data-rt="cc" aria-pressed="true">Comunidades autónomas</button><button type="button" data-rt="prov" aria-pressed="false">Provincias</button></div>
+    <p class="note">Pulsa una fila para abrir su vista. Ordena con las cabeceras. Bajo cada porcentaje, los votos y, si los hay, los escaños.</p>
+    <div class="tw tall"><table class="pt mt mun" id="rtab"></table></div>
+  </section>
+
+  </div>
+  <div class="panel" id="p-par" role="tabpanel" aria-labelledby="tab-par" hidden></div>
+
   <div class="notes" id="notes"></div>
 </div>
 <div class="tt" id="tt"></div>
 <div class="mbox" id="mbox" hidden role="dialog" aria-modal="true" aria-label="Mapa de escaños ampliado"><div class="mbar"><span>Distribución territorial de escaños</span><button type="button" id="bZoomX" aria-label="Cerrar">✕ Cerrar</button></div><div class="mbody"><svg id="emapBig" viewBox="0 0 536 337"></svg></div></div>
-<script src="js/lib.js"></script>
+<script src="js/lib.js" charset="utf-8"></script>
 <script>
 const ARTM = new Set(['PP', 'PSOE', 'PNV', 'BNG', 'CC', 'UPN', 'CUP']);
 const wa = i => (ARTM.has(G.parties[i].k) ? 'el ' : '') + G.parties[i].n;
-let MAP, sel = DEF_PROV;
+let MAP, CCM, sel = DEF_PROV, SELC = DEF_CC, LV = 'prov', RT = 'cc', SORT = { k: 'censo', d: -1 }, PBS, PBM = 'cc', PTS;
 const AN = {};
 function groupsDef() {
   const K = {}; G.parties.forEach((p, i) => K[p.k] = i);
@@ -170,20 +186,41 @@ function terrToggle(on) {
 }
 function an(id) { return AN[id] || (AN[id] = analyze(G.prov[G.pi[id]])) }
 function winSeats(id) { const p = G.prov[G.pi[id]], a = an(id); let b = -1; for (const i of a.order) if (b < 0 || a.es[i] > a.es[b] || (a.es[i] === a.es[b] && p.v[i] > p.v[b])) b = i; return b }
+const unitOf = (lv, id) => lv === 'cc' ? G.cc[G.ci[id]] : lv === 'prov' ? G.prov[G.pi[id]] : { v: G.nat.v, bl: G.nat.bl, nu: G.nat.nu, es: G.nat.es, censo: G.nat.censo, n: 'España' };
+const leadOf = (lv, id) => lv === 'prov' ? winSeats(id) : swin(unitOf(lv, id));
 function tiles() {
-  drawProvMap('#tiles', MAP, { sel, pick: id => { if (sel !== id) { sel = id; tiles(); detail() } },
-    style: id => { const p = G.prov[G.pi[id]], w = winOf(p.v, p.bl); const b = winSeats(id); return shade(b, w ? w.m : 0, 0.22) },
-    title: id => { const p = G.prov[G.pi[id]], b = winSeats(id); return `${p.n} · ${G.parties[b].n} (${an(id).es[b]} de ${p.s})` } });
-  const used = new Set(G.prov.map(p => winSeats(p.id)));
-  $('#mleg').innerHTML = [...used].map(i => `<span><i style="background:${pcol(i)}"></i>${esc(G.parties[i].n)}</span>`).join('') + '<span>Más pálido = ventaja más corta</span>';
+  document.querySelectorAll('[data-lv]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lv === LV));
+  $('#mapt').textContent = { esp: 'Quién lidera España', cc: 'Quién lidera cada comunidad autónoma', prov: 'Quién lidera cada provincia' }[LV];
+  $('#mapn').textContent = LV === 'esp' ? 'Color: partido con más escaños en el conjunto de España; el tono refleja su ventaja en votos sobre el segundo.' : `Color: partido con más escaños en ${LV === 'cc' ? 'cada comunidad (suma de sus provincias)' : 'cada provincia'}; cuanto más pálido, menor la ventaja en votos sobre el segundo. Ceuta y Melilla se muestran como cuadrados y Canarias en su recuadro. Pulsa ${LV === 'cc' ? 'una comunidad' : 'una provincia'} para ver su resumen al lado; el botón del resumen abre su vista.`;
+  const selId = LV === 'cc' ? SELC : LV === 'prov' ? sel : 'ES';
+  drawNatMap('#tiles', MAP, CCM, { mode: LV, sel: selId, pick: id => { if (LV === 'esp') return; if (LV === 'cc') { if (SELC === id) return; SELC = id } else { if (sel === id) return; sel = id } tiles(); detail() },
+    style: id => { const u = unitOf(LV, id), w = winOf(u.v, u.bl), b = leadOf(LV, id); return b < 0 ? 'fill:var(--track)' : shade(b, w ? w.m : 0, 0.22) },
+    title: id => { const u = unitOf(LV, id), b = leadOf(LV, id), sE = LV === 'prov' ? u.s : u.es.reduce((a, c) => a + c, 0); return `${u.n} · ${b < 0 ? 'sin datos' : G.parties[b].n + ' (' + u.es[b] + ' de ' + sE + ' escaños)'}` } });
+  const ids = LV === 'cc' ? G.cc.map(c => c.id) : LV === 'prov' ? G.prov.map(p => p.id) : ['ES'], cnt = {};
+  ids.forEach(id => { const b = leadOf(LV, id); if (b >= 0) cnt[b] = (cnt[b] || 0) + 1 });
+  $('#mleg').innerHTML = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).map(i => `<span><i style="background:${pcol(i)}"></i>${esc(G.parties[i].n)}${LV === 'esp' ? '' : ' ' + cnt[i]}</span>`).join('') + (LV === 'esp' ? '' : '<span>Más pálido = ventaja más corta</span>');
 }
 function detail() {
+  const cc = LV === 'prov' ? ccOfProv(sel) : LV === 'cc' ? SELC : null;
+  $('#bCc').href = hCc(cc || SELC);
+  $('#bProv').href = hProv(sel); $('#bProv').textContent = AUTONOMAS[sel] ? 'Vista de municipio →' : 'Vista por provincia →';
+  if (LV !== 'prov') return sideUnit();
   const p = G.prov[G.pi[sel]], a = an(sel), auto = !!AUTONOMAS[sel];
-  $('#bProv').href = hProv(sel); $('#bProv').textContent = auto ? 'Vista de municipio →' : 'Vista por provincia →';
   const idx = a.order.filter(i => a.es[i] > 0 || a.row[i] >= 0.01).slice(0, 9);
   $('#pd').innerHTML = `<h3>${esc(p.n)}</h3><div class="meta">${p.s} ${p.s === 1 ? 'escaño' : 'escaños'} · ${esc(G.ccaa.find(c => c.id === p.cc)?.n || '')} · ${nf((a.valid - p.bl) / 1e6, 2)} M de votos a candidaturas</div>
   <table class="tbl"><thead><tr><th>Partido</th><th>Voto</th><th>Votos</th><th>Escaños</th></tr></thead><tbody>${idx.map(i => `<tr><td>${swatch(i)}${esc(G.parties[i].n)}</td><td class="d" style="color:var(--ink)">${fmt(a.row[i])}</td><td class="d">${nf(p.v[i])}</td><td class="s">${a.es[i]}</td></tr>`).join('')}</tbody></table>
   <p style="margin:14px 0 0"><a class="btnlk" href="${hProv(sel)}">Ver ${auto ? 'el municipio de ' : 'la provincia de '}${esc(p.n)} →</a></p>`;
+}
+function sideUnit() {
+  const id = LV === 'cc' ? SELC : 'ES', u = unitOf(LV, id), { valid, row } = shares(u.v, u.bl), nr = shares(G.nat.v, G.nat.bl).row, tot = u.es.reduce((a, b) => a + b, 0), vt = valid + u.nu;
+  const idx = u.v.map((x, i) => i).filter(i => u.es[i] > 0 || row[i] >= 0.01).sort((a, b) => u.es[b] - u.es[a] || u.v[b] - u.v[a]).slice(0, 9);
+  const meta = LV === 'esp' ? `${tot} escaños · ${G.cc.length} comunidades y ciudades autónomas` : `${tot} escaños · ${u.provs.length === 1 ? 'comunidad uniprovincial' : u.provs.length + ' provincias'} · participación ${fmt(vt / u.censo)}`;
+  const link = LV === 'cc' ? hCc(id) : null;
+  $('#pd').innerHTML = `<h3>${esc(u.n)}</h3><div class="meta">${meta} · ${nf(valid)} votos válidos</div>
+  <table class="tbl"><thead><tr><th>Partido</th><th>Voto</th><th>Votos</th><th>Escaños</th>${LV === 'esp' ? '' : '<th>Dif.</th>'}</tr></thead><tbody>${idx.map(i => { const d = row[i] - nr[i];
+    return `<tr><td>${swatch(i)}${esc(G.parties[i].n)}</td><td class="d" style="color:var(--ink)">${fmt(row[i])}</td><td class="d">${nf(u.v[i])}</td><td class="s">${u.es[i]}</td>${LV === 'esp' ? '' : `<td class="d"><span class="${d >= 0 ? 'gd' : 'bd'}">${pts(d) || '0,0'}</span></td>`}</tr>` }).join('')}</tbody></table>
+  ${LV === 'esp' ? '<p class="note" style="margin:10px 0 0">Elige «Comunidades autónomas» o «Provincias» para ver quién lidera cada territorio.</p>' : '<p class="note" style="margin:10px 0 0">Los escaños de la comunidad son la suma de los de sus provincias. «Dif.»: diferencia en puntos con el resultado de toda España.</p>'}
+  ${link ? `<p style="margin:14px 0 0"><a class="btnlk" href="${link}">Ver ${id === '18' || id === '19' ? 'la ciudad de ' + esc(CCSHORT[id]) : esc(u.n)} →</a></p>` : ''}`;
 }
 function lastSeats() {
   const MAXG = 4, L = [];
@@ -225,14 +262,63 @@ function thrChart() {
   svg.innerHTML = s;
   svg.querySelectorAll('.thrb').forEach(g => { const go = () => { nav(hProv(g.dataset.id)) }; g.onclick = go; g.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go() } } });
 }
+/* ---- pestañas «Análisis detallado» y «Partidos» ---- */
+const natValid = () => G.nat.v.reduce((a, b) => a + b, 0) + G.nat.bl;
+const PS = () => G.nat.v.map((x, i) => i).filter(i => G.nat.v[i] > 0 && (G.nat.v[i] / natValid() >= 0.005 || G.nat.es[i] > 0)).sort((a, b) => G.nat.es[b] - G.nat.es[a] || G.nat.v[b] - G.nat.v[a]);
+function rtable() {
+  document.querySelectorAll('[data-rt]').forEach(b => b.setAttribute('aria-pressed', b.dataset.rt === RT));
+  $('#rtt').textContent = RT === 'cc' ? 'Resultados por comunidad autónoma' : 'Resultados por provincia';
+  const U = RT === 'cc' ? G.cc : G.prov, ps = PS().filter(i => G.nat.v[i] / natValid() >= 0.01 || G.nat.es[i] > 0);
+  const rows = U.map(u => { const vc = u.v.reduce((a, b) => a + b, 0), valid = vc + u.bl, w = winOf(u.v, u.bl), b = swin(u), o = { u, id: u.id, name: u.n, censo: u.censo, esc: u.es.reduce((a, c) => a + c, 0), part: u.censo ? (valid + u.nu) / u.censo : 0, ganador: w ? G.parties[w.w].n : '', sh: w ? w.sh : 0, margen: w ? w.m : 0, w, lead: b, valid, pbl: valid ? u.bl / valid : 0, cc: RT === 'prov' ? ccName(u.cc) : '' };
+    ps.forEach(i => o['p' + i] = valid ? u.v[i] / valid : 0); return o });
+  const k = SORT.k in rows[0] ? SORT.k : 'censo'; rows.sort((a, b) => (typeof a[k] === 'string' ? a[k].localeCompare(b[k], 'es') : a[k] - b[k]) * SORT.d);
+  const th = (key, lab, cls = '') => `<th data-s="${key}" ${SORT.k === key ? `aria-sort="${SORT.d > 0 ? 'ascending' : 'descending'}"` : ''} class="${cls}">${lab}</th>`;
+  const cell = (sh, v, e) => `<td class="num pc">${fmt(sh)}<small>${nf(v)}${e ? ' · ' + e + ' esc.' : ''}</small></td>`;
+  $('#rtab').innerHTML = `<thead><tr>${th('name', RT === 'cc' ? 'Comunidad' : 'Provincia', 'stk')}${RT === 'prov' ? th('cc', 'Comunidad') : ''}${th('censo', 'Electores')}${th('esc', 'Escaños')}${th('part', 'Particip.')}${th('ganador', 'Más votado')}${th('sh', '% ganador')}${th('margen', 'Ventaja')}${ps.map(i => th('p' + i, `<span class="wn">${swatch(i)}${esc(G.parties[i].n)}</span>`)).join('')}${th('pbl', 'En blanco')}</tr></thead><tbody>${rows.map(r => `<tr class="rw" data-id="${r.id}"><td class="stk">${esc(r.name)}</td>${RT === 'prov' ? `<td>${esc(r.cc)}</td>` : ''}<td class="num">${nf(r.censo)}</td><td class="num">${r.esc}</td><td class="num">${fmt(r.part)}</td><td>${r.w ? `<span class="wn">${swatch(r.w.w)}${esc(r.ganador)}</span>` : '–'}</td><td class="num">${r.w ? fmt(r.sh) : '–'}</td><td class="num">${r.w ? nf(r.margen * 100, 1) + ' pts' : '–'}</td>${ps.map(i => cell(r['p' + i], r.u.v[i], r.u.es[i])).join('')}${cell(r.pbl, r.u.bl)}</tr>`).join('')}</tbody>`;
+  $('#rtab').querySelectorAll('th[data-s]').forEach(t => t.onclick = () => { const kk = t.dataset.s; SORT = { k: kk, d: SORT.k === kk ? -SORT.d : (['name', 'ganador', 'cc'].includes(kk) ? 1 : -1) }; rtable() });
+  $('#rtab').querySelectorAll('tr.rw').forEach(t => t.onclick = () => nav(RT === 'cc' ? hCc(t.dataset.id) : hProv(t.dataset.id)));
+}
+function pblock() {
+  const ps = PS();
+  PBS = PBS || { party: ps[0], ord: 'pct_desc' };
+  const cc = PBM === 'cc', units = (cc ? G.cc : G.prov).map(u => ({ key: u.id, name: u.n, censo: u.censo, part: u.censo ? (u.v.reduce((a, b) => a + b, 0) + u.bl + u.nu) / u.censo : 0, v: u.v, bl: u.bl, nu: u.nu, es: u.es }));
+  partyBlock($('#pbcard'), { state: PBS, ps, units, parent: { v: G.nat.v, bl: G.nat.bl }, parentName: 'en España',
+    modes: [{ id: 'cc', label: 'Por comunidad autónoma' }, { id: 'prov', label: 'Por provincia' }], mode: PBM, onMode: x => { PBM = x; pblock() },
+    unitName: cc ? 'Comunidad' : 'Provincia', unitsPl: cc ? 'comunidades' : 'provincias',
+    note: 'El número junto al nombre es su número de escaños. Elige un partido, el nivel (comunidades o provincias) y cómo ordenar: la tabla muestra los diez primeros, con su voto y sus escaños.',
+    chipSub: j => nf(G.nat.es[j]) + ' esc.', onRow: id => nav(cc ? hCc(id) : hProv(id)) });
+}
+function natDraw(lv) {
+  return (host, styleOf, textOf, titleOf, pick) => {
+    const b = MAP.box, SQ = lv === 'cc' ? { '18': '51', '19': '52' } : { '51': '51', '52': '52' };
+    const shapes = lv === 'cc' ? Object.keys(CCM).filter(k => k !== 'ES' && G.ci[k] !== undefined).map(k => [k, CCM[k].d, CCM[k].l]) : Object.keys(MAP.paths).filter(k => !SQ[k]).map(k => [k, MAP.paths[k], MAP.lab[k]]);
+    let h = shapes.map(([k, d]) => `<path d="${d}" data-k="${k}" style="${styleOf(k)}"><title>${esc(titleOf(k))}</title></path>`).join('');
+    let t = shapes.map(([k, d, l]) => l && textOf ? `<text x="${l[0]}" y="${l[1]}" font-size="17" stroke-width="4">${textOf(k)}</text>` : '').join('');
+    Object.keys(SQ).forEach(k => { const q = MAP.sq[SQ[k]]; if (!q) return; const [x, y, z] = q;
+      h += `<rect data-k="${k}" x="${x}" y="${y}" width="${z}" height="${z}" rx="4" style="${styleOf(k)}"><title>${esc(titleOf(k))}</title></rect>`; if (textOf) t += `<text x="${x + z / 2}" y="${y + z / 2}" font-size="17" stroke-width="4">${textOf(k)}</text>` });
+    host.innerHTML = `<svg class="ptmap pmap" viewBox="0 0 ${MAP.w} ${MAP.h}" role="img" aria-label="Mapa de % de voto">${h}<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" rx="6" style="fill:none;stroke:var(--faint);stroke-dasharray:5 4;pointer-events:none"/>${t}</svg>`;
+    host.querySelectorAll('[data-k]').forEach(p => p.onclick = () => pick(p.dataset.k));
+  };
+}
+function partidos() {
+  const ps = PS(), tot = G.nat.es.reduce((a, b) => a + b, 0);
+  const U = (L, lv) => L.map(u => ({ key: u.id, name: u.n, v: u.v, bl: u.bl, es: u.es, link: lv === 'cc' ? hCc(u.id) : hProv(u.id) }));
+  partyTab($('#p-par'), { state: PTS = PTS || undefined, ps, parent: { name: 'España', v: G.nat.v, bl: G.nat.bl, isNat: true }, chipSub: j => nf(G.nat.es[j]) + ' esc.',
+    seatKpi: i => `<div><b>${G.nat.es[i] || 0}</b><span>escaños de ${tot} en el Congreso</span></div>`,
+    note: 'El número junto al nombre es su número de escaños en España. Elige un partido para ver su porcentaje de voto y sus escaños en cada comunidad o provincia.',
+    levels: [{ id: 'cc', label: 'Comunidades autónomas', one: 'Comunidad', pl: 'comunidades', labels: true, units: U(G.cc, 'cc'), draw: natDraw('cc') },
+      { id: 'prov', label: 'Provincias', one: 'Provincia', pl: 'provincias', labels: true, units: U(G.prov, 'prov'), draw: natDraw('prov') }] });
+}
 (async () => {
   try {
-    await loadG(); MAP = await jget('mapas/provincias.json'); if (!G.sections) $('#bMun').title = 'Resultados de un municipio';
-    partic(); votes(); seatsView(); groups(); tiles(); detail(); lastSeats(); thrChart();
+    await loadG(); [MAP, CCM] = await Promise.all([jget('mapas/provincias.json'), jget('mapas/ccaa.json')]); if (!G.sections) $('#bMun').title = 'Resultados de un municipio';
+    partic(); votes(); seatsView(); groups(); tiles(); detail(); lastSeats(); thrChart(); rtable(); pblock(); partidos();
+    document.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { LV = b.dataset.lv; tiles(); detail() });
+    document.querySelectorAll('[data-rt]').forEach(b => b.onclick = () => { RT = b.dataset.rt; rtable() });
     const zoom = on => { $('#mbox').hidden = !on; document.body.style.overflow = on ? 'hidden' : ''; if (on) $('#bZoomX').focus() };
     $('#bZoom').onclick = () => zoom(true); $('#bZoomX').onclick = () => zoom(false); document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#mbox').hidden) zoom(false) });
     $('#bParl').onclick = () => terrToggle(false); $('#bTerr').onclick = () => terrToggle(true);
-    await mountBar('');
+    mountTabs(); await mountBar('', null, '');
     $('#bMun').href = hMun(DEF_MUN);
     $('#notes').innerHTML = notesHTML(); document.title = 'Elecciones al Congreso ' + G.year + (G.id.slice(5) === '04' ? ' (abril)' : G.id === '2019-11' ? ' (noviembre)' : '');
   } catch (e) { $('#notes').textContent = 'No se pudieron cargar los datos: ' + e }
